@@ -13,5 +13,7 @@ export const ALL_TABLES = [
   'self_profile',
   'places',
   'looks',
-  'bazi_qa'
+  'bazi_qa',
+  'health_logs',
+  'signals'
 ];

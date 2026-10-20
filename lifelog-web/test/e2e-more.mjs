@@ -37,21 +37,21 @@ const box = await page.locator('input[placeholder="例如 美团"]').boundingBox
 ok(box && box.width > 120, '手机上商户输入框宽度正常（' + Math.round(box?.width) + 'px）');
 
 // 导入 + 去重
-await nav('导入');
+await nav('导入账单');
 await page.setInputFiles('#file-input', ROOT + 'test/sample-alipay.csv');
 await page.waitForTimeout(1200);
 await page.click('button:has-text("确认导入 6 笔")');
 await page.waitForTimeout(1500);
 const n1 = await count('transactions');
 ok(n1 === 6, '导入 6 笔写入云端（' + n1 + '）');
-await nav('导入');
+await nav('导入账单');
 await page.setInputFiles('#file-input', ROOT + 'test/sample-alipay.csv');
 await page.waitForTimeout(1200);
 const confirmBtn = page.locator('button:has-text("确认导入")').first();
 if (await confirmBtn.count()) { await confirmBtn.click(); await page.waitForTimeout(1500); }
 const n2 = await count('transactions');
 ok(n2 === 6, '同一文件再导入不重复（' + n2 + '）');
-await nav('导入');
+await nav('导入账单');
 await page.setInputFiles('#file-input', ROOT + 'test/wechat.csv');
 await page.waitForTimeout(1200);
 await page.screenshot({ path: SHOTS + 'flow2-wechat.png' });
@@ -60,7 +60,7 @@ if (await wbtn.count()) { await wbtn.click(); await page.waitForTimeout(1500); }
 ok((await count('transactions')) > 6, '微信账单导入（共 ' + (await count('transactions')) + ' 笔）');
 
 // 财务页
-await nav('财务');
+await nav('财富总览');
 await page.screenshot({ path: SHOTS + 'flow2-finance.png' });
 
 // 生辰 → 运势
@@ -86,7 +86,7 @@ await page.waitForTimeout(500);
 await page.screenshot({ path: SHOTS + 'flow2-bazi.png' });
 
 // 人物卡
-await nav('圈子');
+await nav('家人与圈子');
 await page.click('text=+ 新卡片');
 await page.waitForTimeout(400);
 await page.locator('.editor input').first().fill('妈妈');
@@ -95,7 +95,7 @@ await page.waitForTimeout(800);
 ok((await count('people')) === 1, '人物卡写入云端');
 
 // 目标 + 任务
-await nav('目标/任务/日程');
+await nav('目标 / 任务 / 日程');
 await page.click('text=+ 立个目标');
 await page.waitForTimeout(300);
 await page.fill('textarea[placeholder^="目标是什么"], input[placeholder^="目标是什么"]', '三个月存 3 万');

@@ -19,6 +19,9 @@ import { homeView, loadHome } from './view-home.js';
 import { expertView } from './view-expert.js';
 import { peopleView, loadPeople } from './view-people.js';
 import { placeView, loadPlaces } from './view-place.js';
+import { healthView, loadHealth } from './view-health.js';
+import { looksView, loadLooks } from './view-looks.js';
+import { signalsView, loadSignals } from './view-signals.js';
 import { EXPERTS } from './experts.js';
 import { ensureModel } from './ai.js';
 import {
@@ -39,41 +42,49 @@ import { setupLogin, loginView } from './view-login.js';
 
 const root = document.getElementById('app');
 
+/* 导航按「人生五件事」分组：财富、家庭、开心、健康、形象，外加机会、命理与工具。
+   group 为分组标题（侧栏显示），没有 group 的跟上一个组。 */
 const NAV = [
   { k: 'home', label: '首页', icon: '⌂' },
-  { k: 'diary', label: '日记', icon: '✎' },
-  { k: 'life', label: '生活', icon: '◈' },
-  { k: 'people', label: '圈子', icon: '◉' },
-  { k: 'bazi', label: '八字', icon: '☯' },
-  { k: 'goals', label: '目标/任务/日程', icon: '◎' },
-  { k: 'fortune', label: '运势', icon: '☰' },
-  { k: 'finance', label: '财务', icon: '¥' },
+  { k: 'diary', label: '记录', icon: '✎', group: '记录' },
+  { k: 'goals', label: '目标 / 任务 / 日程', icon: '◎' },
+  { k: 'life', label: '工作与生活', icon: '◈' },
+  { k: 'finance', label: '财富总览', icon: '¥', group: '财富' },
   { k: 'tx', label: '账单', icon: '≡' },
-  { k: 'import', label: '导入', icon: '⇪' },
-  { k: 'chat', label: '问问账本', icon: '◌' },
+  { k: 'import', label: '导入账单', icon: '⇪' },
+  { k: 'signals', label: '利好消息', icon: '✦' },
+  { k: 'people', label: '家人与圈子', icon: '◉', group: '家庭' },
+  { k: 'health', label: '身体健康', icon: '✚', group: '身心' },
+  { k: 'looks', label: '穿搭形象', icon: '✧' },
+  { k: 'bazi', label: '八字', icon: '☯', group: '命理' },
+  { k: 'fortune', label: '运势', icon: '☰' },
+  { k: 'chat', label: '问问账本', icon: '◌', group: 'AI' },
   { k: 'expert', label: '专家', icon: '🧑‍💼' },
-  { k: 'settings', label: '设置', icon: '⚙' }
+  { k: 'settings', label: '设置', icon: '⚙', group: '' }
 ];
 
-/* 手机底部标签栏：首页 / 工作 / 随手记 / 记账 / 更多 */
+/* 手机底部标签栏：首页 / 记录 / 财富 / 身心 / 更多 */
 const MOBILE_TABS = [
   { k: 'home', label: '首页', icon: '🏠' },
-  { k: 'life', label: '工作', icon: '💼' },
-  { k: 'diary', label: '随手记', icon: '📝' },
-  { k: 'tx', label: '记账', icon: '💰' }
+  { k: 'diary', label: '记录', icon: '📝' },
+  { k: 'finance', label: '财富', icon: '💰' },
+  { k: 'health', label: '身心', icon: '💪' }
 ];
 
-/* 「更多」弹层里的入口 */
+/* 「更多」弹层里的入口，按板块排 */
 const MORE_ITEMS = [
-  { k: 'people', label: '我的圈子', icon: '◉' },
-  { k: 'goals', label: '目标 / 任务 / 日程', icon: '🎯' },
+  { k: 'tx', label: '账单 / 记一笔', icon: '💳' },
+  { k: 'signals', label: '利好消息', icon: '📰' },
+  { k: 'people', label: '家人与圈子', icon: '🏠' },
+  { k: 'looks', label: '穿搭形象', icon: '👔' },
+  { k: 'goals', label: '目标 / 任务', icon: '🎯' },
+  { k: 'life', label: '工作与生活', icon: '💼' },
   { k: 'bazi', label: '八字命理', icon: '☯️' },
   { k: 'fortune', label: '每日运势', icon: '🔮' },
-  { k: 'place', label: '我在哪里', icon: '📍' },
-  { k: 'finance', label: '财务分析', icon: '📊' },
   { k: 'chat', label: '问问账本', icon: '💬' },
   { k: 'expert', label: '专家中心', icon: '🧑‍💼' },
   { k: 'import', label: '导入账单', icon: '⇪' },
+  { k: 'place', label: '我在哪里', icon: '📍' },
   { k: 'settings', label: '设置', icon: '⚙' }
 ];
 
@@ -94,7 +105,8 @@ function shell() {
         h('div', { class: 'brand-mark' }, '我'),
         h('div', { class: 'brand-name' }, '个人APP')
       ),
-      ...NAV.map((n) =>
+      ...NAV.flatMap((n) => [
+        n.group ? h('div', { class: 'nav-group' }, n.group) : n.group === '' ? h('div', { class: 'nav-gap' }) : null,
         h(
           'button',
           {
@@ -104,7 +116,7 @@ function shell() {
           h('span', { class: 'ic' }, n.icon),
           n.label
         )
-      ),
+      ]),
       h(
         'div',
         { class: 'side-foot' },
@@ -248,6 +260,12 @@ function currentView() {
       return peopleView();
     case 'place':
       return placeView();
+    case 'health':
+      return healthView();
+    case 'looks':
+      return looksView();
+    case 'signals':
+      return signalsView();
     case 'bazi':
       return baziSelfView();
     case 'fortune':
@@ -297,6 +315,9 @@ async function go(view) {
   if (view === 'life') tasks.push(loadLife().catch(fail('生活')));
   if (view === 'people') tasks.push(loadPeople().catch(fail('圈子')));
   if (view === 'place') tasks.push(loadPlaces().catch(fail('位置')));
+  if (view === 'health') tasks.push(loadHealth().catch(fail('健康')));
+  if (view === 'looks') tasks.push(loadLooks().catch(fail('穿搭')));
+  if (view === 'signals') tasks.push(loadSignals().catch(fail('利好消息')));
   if (view === 'bazi') {
     try {
       ensureBirth();
@@ -520,6 +541,10 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', guardIdle);
 setInterval(guardIdle, 30 * 1000);
 window.addEventListener('lifelog-signout', () => signOut(''));
+/* 各页面要跳转时发 lifelog-go 事件（避免循环导入 main.js） */
+window.addEventListener('lifelog-go', (ev) => {
+  if (ev.detail) go(ev.detail);
+});
 
 /* 启动失败的兜底界面：给出原因和重试入口，绝不停在空白页 */
 function showBootError(e) {

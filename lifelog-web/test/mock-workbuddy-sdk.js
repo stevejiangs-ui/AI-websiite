@@ -21,7 +21,17 @@ const sessionFor = (email) => ({ accessToken: 'tok-' + Date.now(), user: { id: '
 
 export function createWorkBuddyCloud() {
   return {
-    database: local.database,
+    /* window.__noNewTables = true 时模拟「新表还没建」（42P01） */
+    database: {
+      from(t) {
+        if (window.__noNewTables && (t === 'health_logs' || t === 'signals')) {
+          const res = { data: null, error: { code: '42P01', message: `relation "public.${t}" does not exist` } };
+          const q = new Proxy({}, { get: (_, k) => (k === 'then' ? (ok) => Promise.resolve(res).then(ok) : () => q) });
+          return q;
+        }
+        return local.database.from(t);
+      }
+    },
     auth: {
       async getSession() {
         return { data: get(SKEY, null), error: null };

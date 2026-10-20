@@ -64,6 +64,18 @@ export async function runDigest(entry) {
       entry_date: entry.entry_date
     });
     await saveDigest(entry.id, result);
+    /* 没手选分类的，用 AI 给的分类补上，首页各板块才能归拢到这条 */
+    if ((!Array.isArray(entry.facets) || !entry.facets.length) && result.facets && result.facets.length) {
+      try {
+        await saveEntry({ ...entry, facets: result.facets, summary: undefined, key_points: undefined, topics: undefined, ai_at: undefined });
+        entry.facets = result.facets;
+        const h0 = (state.entries || []).find((x) => x.id === entry.id);
+        if (h0) h0.facets = result.facets;
+        if (state.entryEditor && state.entryEditor.id === entry.id) state.entryEditor.facets = result.facets;
+      } catch (e) {
+        /* 分类补不上不影响提炼 */
+      }
+    }
     /* 提炼出的待办同步进 todos 表，首页/工作页读的是那张表。
        已在表里的不重复插入，所以重新提炼不会把已完成的又翻出来。 */
     try {

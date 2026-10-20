@@ -48,7 +48,7 @@ await page.waitForSelector('.shell');
 ok(true, '验证码正确 → 改密码并直接进入');
 
 // 数据读写
-await nav('日记');
+await nav('记录');
 await page.click('text=+ 写一篇');
 await page.fill('#entry-content', '今天在国内打开个人APP，记一笔日记，晚上吃兰州拉面。');
 await page.click('text=记下');
@@ -86,6 +86,19 @@ await page.fill('#login-pass', 'newpass456');
 await page.click('.login-card button:has-text("登录")');
 await page.waitForSelector('.shell');
 ok(true, '新密码登录成功');
+
+// 新功能在 WorkBuddy 上：表已建 → 正常；表未建 → 显示建表提示，不报错
+await nav('身体健康');
+await page.waitForSelector('#hl-sleep');
+ok(true, '身体健康页正常（表已建时）');
+await page.evaluate(() => { window.__noNewTables = true; });
+await nav('利好消息');
+await page.waitForTimeout(800);
+ok((await page.textContent('.main')).includes('还差一步') && (await page.textContent('.main')).includes('migrations/'), '表未建时显示建表提示');
+await nav('首页');
+await page.waitForTimeout(1200);
+ok((await page.textContent('.pillar-grid')).includes('待开通'), '首页板块显示「待开通」，其它照常');
+await page.evaluate(() => { window.__noNewTables = false; });
 
 // 退出按钮
 await nav('设置');

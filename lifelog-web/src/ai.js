@@ -1,4 +1,5 @@
 import { cloud } from './cloud.js';
+import { FACET_KEYS } from './facets.js';
 
 const SYSTEM_BASE = `你是用户的私人生活记录与财务分析师，能看到用户的日记和账单数据。
 要求：
@@ -227,7 +228,8 @@ const DIGEST_SCHEMA = `输出格式：
   "todos": ["文中提到的待办或计划，没有就空数组"],
   "people": ["文中提到的人，没有就空数组"],
   "money": "文中提到的金钱事项（金额/花费/收入），没有就空字符串",
-  "title": "如果原文没有标题，可给一个 8 字以内的标题；有标题就原样返回"
+  "title": "如果原文没有标题，可给一个 8 字以内的标题；有标题就原样返回",
+  "facets": ["从这些分类里选 1-3 个最贴切的 key：work 工作, chores 琐事, spend 花销, bank 银行投资, legal 法务, family 家庭, joy 开心事, relation 朋友关系, appearance 形象穿搭, health 健康, fortune 运势, note 随手记"]
 }
 说明：
 - points 是这篇日记里最值得记住的具体事实（谁、做了什么、结果如何），3-6 条，每条一行、20 字以内，不要空话。
@@ -298,6 +300,36 @@ export async function digestEntry({ title, content, entry_date }) {
     todos: asList(j.todos, 5),
     people: asList(j.people, 5),
     money: String(j.money || '').trim(),
-    title: String(j.title || '').trim()
+    title: String(j.title || '').trim(),
+    facets: asList(j.facets, 3).filter((k) => FACET_KEYS.includes(k))
   };
+}
+
+/* ---------- 通用：一次性问答（健康建议、穿搭建议、利好消息分析、今日建议） ---------- */
+
+const PERSONAL_SYSTEM = `你是用户的私人顾问，目标只有一个：帮用户发财、家庭幸福、开心、身体健康、形象得体。
+要求：中文，具体、可执行，不说空话套话；引用用户给的数据；不编造事实；不做医疗诊断，涉及身体异常时建议就医。`;
+
+export async function askAI(prompt, { fast = false, system = PERSONAL_SYSTEM, timeoutMs = 90000 } = {}) {
+  const text = await complete(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt }
+    ],
+    { fast, timeoutMs }
+  ).catch((e) => {
+    if (e?.name === 'AbortError') throw new Error('AI 回答超时，请稍后重试');
+    throw e;
+  });
+  const out = String(text || '').trim();
+  if (!out) throw new Error('AI 没有给出回答，请重试');
+  return out;
+}
+
+/** 要求 AI 只输出 JSON 对象，解析失败抛错 */
+export async function askJSON(prompt, opts = {}) {
+  const text = await askAI(prompt + '\n\n严格只输出一个 JSON 对象，不要代码块、不要解释。', { ...opts, fast: opts.fast ?? true });
+  const j = pickJson(text);
+  if (!j) throw new Error('AI 结果解析失败，请重试');
+  return j;
 }

@@ -16,7 +16,7 @@ export function errText(e) {
   if (e.kind === 'unauthenticated') return '登录已失效，请重新登录';
   if (e.code === '23505') return '这条记录已经存在了';
   if (e.code === '42501') return '没有权限执行该操作';
-  if (e.code === '42P01') return '数据表尚未创建，请联系管理员';
+  if (e.code === '42P01') return '这个功能的数据表还没建好（WorkBuddy 版需要先按 migrations/ 里的说明建表）';
   return e.message || String(e);
 }
 
@@ -728,3 +728,94 @@ export async function deleteLook(id) {
   return Array.isArray(rows) && rows.length > 0;
 }
 
+
+/* ---------------- 身体健康：每日打卡 ----------------
+   一天一条（按 log_date），重复保存就是更新。 */
+
+export const MOOD_SCALE = [
+  { v: 1, label: '很差', em: '😣' },
+  { v: 2, label: '一般', em: '😕' },
+  { v: 3, label: '还行', em: '🙂' },
+  { v: 4, label: '不错', em: '😊' },
+  { v: 5, label: '很开心', em: '😄' }
+];
+
+export async function listHealth({ days = 120 } = {}) {
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  const p = (n) => String(n).padStart(2, '0');
+  const fromStr = `${from.getFullYear()}-${p(from.getMonth() + 1)}-${p(from.getDate())}`;
+  return unwrap(await cloud.database.from('health_logs').select('*').gte('log_date', fromStr).order('log_date', { ascending: false }).limit(400));
+}
+
+export async function saveHealthLog(rec) {
+  const num = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+  const base = {
+    log_date: rec.log_date || today(),
+    sleep_hours: num(rec.sleep_hours),
+    weight_kg: num(rec.weight_kg),
+    exercise_min: num(rec.exercise_min),
+    steps: num(rec.steps),
+    mood: num(rec.mood),
+    energy: num(rec.energy),
+    water_cups: num(rec.water_cups),
+    note: rec.note || '',
+    updated_at: nowIso()
+  };
+  const existing = unwrap(await cloud.database.from('health_logs').select('id').eq('log_date', base.log_date).limit(1));
+  if (Array.isArray(existing) && existing[0]?.id) {
+    return unwrap(await cloud.database.from('health_logs').update(base).eq('id', existing[0].id).select());
+  }
+  const me = await currentUserId();
+  return unwrap(await cloud.database.from('health_logs').insert({ ...base, owner_id: me }).select());
+}
+
+/* ---------------- 利好消息 / 机会 ----------------
+   看到对自己可能有利的外部信息（新闻、政策、行情、招聘、人脉消息…）就存进来，
+   AI 结合你的目标判断利弊、给出行动建议。status：new 新 / acted 已行动 / archived 归档 */
+
+export const SIGNAL_AREAS = [
+  { k: 'money', label: '财富', color: '#b4552f' },
+  { k: 'work', label: '事业', color: '#4a6fa5' },
+  { k: 'family', label: '家庭', color: '#cf7a5e' },
+  { k: 'health', label: '健康', color: '#3f8c5e' },
+  { k: 'life', label: '生活', color: '#5aa9a3' }
+];
+
+export function signalArea(k) {
+  return SIGNAL_AREAS.find((a) => a.k === k) || SIGNAL_AREAS[4];
+}
+
+export async function listSignals() {
+  return unwrap(await cloud.database.from('signals').select('*').order('id', { ascending: false }).limit(300));
+}
+
+export async function saveSignal(s) {
+  const base = {
+    title: String(s.title || '').trim(),
+    content: s.content || '',
+    url: s.url || '',
+    source: s.source || '',
+    area: s.area || 'life',
+    status: s.status || 'new',
+    ai_take: s.ai_take ?? null,
+    ai_score: s.ai_score ?? null,
+    ai_at: s.ai_at ?? null,
+    updated_at: nowIso()
+  };
+  if (!base.title && !base.content) throw new Error('标题和内容至少填一个');
+  if (!base.title) base.title = base.content.slice(0, 40);
+  if (s.id) return unwrap(await cloud.database.from('signals').update(base).eq('id', s.id).select());
+  const me = await currentUserId();
+  return unwrap(await cloud.database.from('signals').insert({ ...base, owner_id: me }).select());
+}
+
+export async function deleteSignal(id) {
+  const rows = unwrap(await cloud.database.from('signals').delete().eq('id', id).select());
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/** 表还没建（WorkBuddy 新功能需要先建表）时返回 true，页面据此显示建表提示 */
+export function isMissingTable(e) {
+  return !!e && (e.code === '42P01' || /does not exist|relation .* not exist|未创建|not found.*table/i.test(String(e.message || '')));
+}

@@ -44,7 +44,7 @@ const st = await page.evaluate(() => document.getElementById('main-scroll').scro
 ok(st > 0, '勾选待办后滚动位置保持（scrollTop=' + st + '）');
 
 // 2. 日记
-await nav('日记');
+await nav('记录');
 await page.click('text=+ 写一篇');
 await page.waitForSelector('#entry-content');
 await page.fill('#entry-title', '平常的一天');
@@ -70,7 +70,7 @@ ok(await page.isVisible('text=兰州拉面馆'), '手工记账出现在列表');
 ok((await page.textContent('.main')).includes('18.00'), '金额统计 18.00');
 
 // 4. 导入账单 CSV
-await nav('导入');
+await nav('导入账单');
 const fi = await page.$('#file-input');
 await fi.setInputFiles([ROOT + 'test/sample-alipay.csv']);
 await page.waitForTimeout(1500);
@@ -90,7 +90,7 @@ const b = backup ? JSON.parse(backup) : null;
 ok(b && b.data.entries.length === 1 && b.data.todos.length >= 1, '备份包含日记/待办（所有表：' + (b ? Object.keys(b.data).length : 0) + ' 张）');
 
 // 6. 删除日记（应用内确认框）
-await nav('日记');
+await nav('记录');
 await page.click('text=平常的一天');
 await page.waitForTimeout(400);
 const delBtn = await page.$('.editor button:has-text("删除")');
@@ -112,7 +112,7 @@ await page.waitForSelector('.dlg');
 await page.click('.dlg button:has-text("开始恢复")');
 await page.waitForTimeout(1500);
 ok((await page.textContent('.main')).includes('恢复完成'), '恢复备份完成');
-await nav('日记');
+await nav('记录');
 ok(await page.isVisible('text=平常的一天'), '恢复后日记回来了');
 
 // 8. 问问账本

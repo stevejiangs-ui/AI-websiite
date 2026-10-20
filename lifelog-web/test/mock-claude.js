@@ -97,8 +97,9 @@
     const last = Array.isArray(input) ? input[input.length - 1].content : input;
     let text;
     if (/JSON 数组/.test(last) && /归类/.test(last)) text = '[{"i":1,"c":"餐饮"}]';
+    else if (/"verdict"/.test(last)) text = '{"score":2,"area":"money","verdict":"对你的投资目标很有利","why":"和你在推进的目标直接相关","actions":["本周联系中介了解","算一下现金流"],"deadline":"年底前"}';
     else if (/结构化摘要|"summary"/.test(JSON.stringify(input)))
-      text = '{"summary":"今天去了公司，晚上吃了兰州拉面。","points":["上班","吃拉面"],"topics":["工作","饮食"],"mood":"calm","todos":["明天交报告"],"people":["小王"],"money":"拉面 18 元","title":"平常的一天"}';
+      text = '{"summary":"今天去了公司，晚上吃了兰州拉面。","points":["上班","吃拉面"],"topics":["工作","饮食"],"mood":"calm","todos":["明天交报告"],"people":["小王"],"money":"拉面 18 元","title":"平常的一天","facets":["joy","family"]}';
     else text = '这是模拟的 Claude 回答：' + String(last).slice(0, 30);
     await new Promise((r) => setTimeout(r, 50));
     const half = Math.floor(text.length / 2);
