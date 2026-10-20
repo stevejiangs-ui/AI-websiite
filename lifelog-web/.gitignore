@@ -1,0 +1,4 @@
+node_modules/
+test/shots/
+dist/artifact.html
+.DS_Store

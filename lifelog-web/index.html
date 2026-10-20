@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>个人APP</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="个人APP" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#f7f6f3" />
+    <meta name="format-detection" content="telephone=no" />
+    <!--INLINE_CSS-->
+  </head>
+  <body style="margin:0;background:#f7f6f3">
+    <!-- 启动画面自带内联样式：CSS 还没生效的那一瞬间也不会是白屏 -->
+    <div id="app">
+      <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+                  gap:16px;background:#f7f6f3;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+        <div style="width:56px;height:56px;border-radius:16px;background:#23211d;color:#fff;
+                    display:flex;align-items:center;justify-content:center;font-size:22px">我</div>
+        <div style="color:#9a958c;font-size:13px">正在启动个人APP…</div>
+        <div id="boot-status" style="color:#a39b8d;font-size:11.5px">加载中</div>
+      </div>
+    </div>
+    <!--INLINE_JS-->
+  </body>
+</html>

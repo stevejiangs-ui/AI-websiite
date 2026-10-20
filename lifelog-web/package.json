@@ -1,0 +1,16 @@
+{
+  "name": "lifelog-web",
+  "version": "2.0.0",
+  "description": "个人APP：日记 + 账单 + 目标 + 圈子 + 八字命理，单文件 Web 应用，运行在 claude.ai 上",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "for f in test/verify-*.mjs; do node $f | tail -1; done",
+    "e2e": "node build.mjs && node test/e2e-auth.mjs && node test/e2e-basic.mjs && node test/e2e-more.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright": "^1.56.0"
+  }
+}
