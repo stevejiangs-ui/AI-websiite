@@ -76,7 +76,7 @@ const city = page.locator('#birth-city');
 if (await city.count()) { await city.fill('顺德'); await page.waitForTimeout(400); const opt = page.locator('text=顺德').nth(1); if (await opt.count()) await opt.click().catch(()=>{}); }
 await page.click('.editor .seg button:has-text("男")');
 await page.locator('.editor button:has-text("保存")').last().click();
-await page.waitForTimeout(1200);
+await page.waitForFunction(() => Object.keys(window.__mockStore).some((k) => k.includes('/t/birth_info/')), null, { timeout: 8000 }).catch(() => {});
 ok((await count('birth_info')) === 1, '生辰写入云端');
 await page.screenshot({ path: SHOTS + 'flow2-fortune.png' });
 ok(await page.isVisible('text=大运'), '运势页显示大运');

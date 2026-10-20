@@ -1,6 +1,7 @@
 /* 登录界面：注册（首次）/ 登录 / 忘记密码（恢复码）/ 显示恢复码 */
 import { h, render, toast } from './store.js';
-import { register, login, resetWithCode, accountEmail, lockedForMs, EMAIL_RE, IDLE_LIMIT_MS } from './auth.js';
+import { register, login, resetWithCode, requestEmailCode, resetWithEmailCode, resendWaitMs, accountEmail, lockedForMs, EMAIL_RE, IDLE_LIMIT_MS } from './auth.js';
+import { sendCodeEmail } from './mailer.js';
 
 let ls = {
   mode: 'login', // register | login | recover | code
@@ -12,8 +13,22 @@ let ls = {
   err: '',
   hint: '',
   newCode: '',
-  saved: false
+  saved: false,
+  via: 'email', // 找回方式：email | code
+  otp: '',
+  sentTo: '',
+  sending: false
 };
+
+/* 「重新发送」倒计时：每秒刷新一次按钮上的秒数 */
+let tick = null;
+function startTick() {
+  clearInterval(tick);
+  tick = setInterval(() => {
+    if (resendWaitMs() <= 0) clearInterval(tick);
+    render();
+  }, 1000);
+}
 
 let onEnter = () => {};
 
@@ -68,7 +83,7 @@ async function run(fn) {
 function submit() {
   if (ls.mode === 'register') return doRegister();
   if (ls.mode === 'login') return doLogin();
-  if (ls.mode === 'recover') return doRecover();
+  if (ls.mode === 'recover') return ls.via === 'email' ? doEmailReset() : doRecover();
   return null;
 }
 
@@ -108,6 +123,37 @@ function doRecover() {
   });
 }
 
+async function sendCode() {
+  if (ls.sending) return;
+  ls.sending = true;
+  ls.err = '';
+  render();
+  try {
+    if (!EMAIL_RE.test(ls.email.trim())) throw new Error('请输入正确的邮箱地址');
+    ls.sentTo = await requestEmailCode(ls.email, sendCodeEmail);
+    startTick();
+  } catch (e) {
+    ls.err = (e && e.message) || String(e);
+  }
+  ls.sending = false;
+  render();
+}
+
+function doEmailReset() {
+  return run(async () => {
+    if (!ls.sentTo) throw new Error('请先点「发送验证码」');
+    if (!/^\d{6}$/.test(ls.otp.trim())) throw new Error('请输入邮件里的 6 位数字验证码');
+    if (ls.password.length < 6) throw new Error('新密码至少 6 位');
+    if (ls.password !== ls.password2) throw new Error('两次输入的新密码不一致');
+    await resetWithEmailCode(ls.email, ls.otp, ls.password);
+    ls.password = ls.password2 = ls.otp = '';
+    ls.sentTo = '';
+    clearInterval(tick);
+    toast('密码已重设');
+    onEnter();
+  });
+}
+
 function errBox() {
   const lock = lockedForMs();
   return h('div', { class: 'err' }, ls.err || (lock ? `输错次数太多，请 ${Math.ceil(lock / 1000)} 秒后再试` : ''));
@@ -132,7 +178,7 @@ function registerCard() {
     input('reg-pass2', '确认密码', 'password2', { type: 'password', placeholder: '再输入一次', autocomplete: 'new-password' }),
     errBox(),
     primary('创建并进入'),
-    h('p', { class: 'hint' }, '创建后会给你一个恢复码，忘记密码时用它重设。请务必保存好。')
+    h('p', { class: 'hint' }, '忘记密码时可以用邮箱验证码重设。创建后还会给你一个恢复码作为备用，请保存好。')
   );
 }
 
@@ -149,10 +195,58 @@ function loginCard() {
       'div',
       { class: 'row-between', style: 'margin-top:2px' },
       h('span', { class: 'muted', style: 'font-size:11.5px' }, `${IDLE_LIMIT_MS / 60000} 分钟没有操作会自动退出`),
-      h('button', { class: 'link', style: 'font-size:12.5px', onclick: () => set({ mode: 'recover', err: '', password: '', password2: '', code: '' }) }, '忘记密码？')
+      h('button', { class: 'link', style: 'font-size:12.5px', onclick: () => set({ mode: 'recover', via: 'email', err: '', password: '', password2: '', code: '', otp: '' }) }, '忘记密码？')
     ),
     errBox(),
     primary('登录')
+  );
+}
+
+function recoverTabs() {
+  const tab = (k, label) =>
+    h('button', { class: ls.via === k ? 'on' : '', onclick: () => set({ via: k, err: '' }) }, label);
+  return h('div', { class: 'seg', style: 'margin:4px 0 14px' }, tab('email', '邮箱验证码'), tab('code', '恢复码'));
+}
+
+function emailResetBody() {
+  const wait = resendWaitMs();
+  const sendLabel = ls.sending ? h('span', { class: 'spinner spinner-sm' }) : wait > 0 ? `${Math.ceil(wait / 1000)} 秒后可重发` : ls.sentTo ? '重新发送' : '发送验证码';
+  return h(
+    'div',
+    {},
+    input('rec-email', '邮箱', 'email', { type: 'email', placeholder: 'you@example.com', autocomplete: 'username', inputmode: 'email', autocapitalize: 'off' }),
+    h(
+      'button',
+      { class: 'btn btn-block' + (ls.sentTo ? ' btn-ghost' : ' btn-accent'), id: 'send-code', disabled: ls.sending || wait > 0, onclick: sendCode },
+      sendLabel
+    ),
+    ls.sentTo ? h('div', { class: 'ok-msg', style: 'margin:10px 0 6px' }, `验证码已发到 ${ls.sentTo}，10 分钟内有效。没收到就看一下垃圾邮件箱。`) : null,
+    ls.sentTo
+      ? h(
+          'div',
+          {},
+          input('rec-otp', '邮件里的 6 位验证码', 'otp', { placeholder: '6 位数字', inputmode: 'numeric', autocomplete: 'one-time-code' }),
+          input('rec-pass', '新密码', 'password', { type: 'password', placeholder: '至少 6 位', autocomplete: 'new-password' }),
+          input('rec-pass2', '确认新密码', 'password2', { type: 'password', placeholder: '再输入一次', autocomplete: 'new-password' })
+        )
+      : null,
+    errBox(),
+    ls.sentTo ? primary('重设密码并登录') : null,
+    h('p', { class: 'hint' }, '验证码会从你在 claude.ai 连接的 Gmail 发出，第一次发送时会弹窗请你允许。')
+  );
+}
+
+function codeResetBody() {
+  return h(
+    'div',
+    {},
+    input('rec-email', '邮箱', 'email', { type: 'email', placeholder: 'you@example.com', autocomplete: 'username', inputmode: 'email', autocapitalize: 'off' }),
+    input('rec-code', '恢复码', 'code', { placeholder: 'XXXX-XXXX-XXXX-XXXX', autocapitalize: 'characters' }),
+    input('rec-pass', '新密码', 'password', { type: 'password', placeholder: '至少 6 位', autocomplete: 'new-password' }),
+    input('rec-pass2', '确认新密码', 'password2', { type: 'password', placeholder: '再输入一次', autocomplete: 'new-password' }),
+    errBox(),
+    primary('重设密码并登录'),
+    h('p', { class: 'hint' }, '恢复码是注册时给你的那串 16 位字符。用它重设后会换一个新的恢复码。')
   );
 }
 
@@ -160,19 +254,10 @@ function recoverCard() {
   return h(
     'div',
     { class: 'login-card' },
-    h('h2', {}, '重设密码'),
-    h('p', { class: 'sub' }, '用注册时保存的恢复码设一个新密码'),
-    input('rec-email', '邮箱', 'email', { type: 'email', placeholder: 'you@example.com', autocomplete: 'username', inputmode: 'email', autocapitalize: 'off' }),
-    input('rec-code', '恢复码', 'code', { placeholder: 'XXXX-XXXX-XXXX-XXXX', autocapitalize: 'characters' }),
-    input('rec-pass', '新密码', 'password', { type: 'password', placeholder: '至少 6 位', autocomplete: 'new-password' }),
-    input('rec-pass2', '确认新密码', 'password2', { type: 'password', placeholder: '再输入一次', autocomplete: 'new-password' }),
-    errBox(),
-    primary('重设密码并登录'),
-    h(
-      'p',
-      { class: 'hint' },
-      '这个应用运行在 claude.ai 里，不能发邮件，所以用恢复码代替邮箱验证码。恢复码也丢了的话，可以在 Claude 里让我帮你清除登录设置（数据不会丢）。'
-    ),
+    h('h2', {}, '找回密码'),
+    h('p', { class: 'sub' }, ls.via === 'email' ? '给注册邮箱发验证码，验证后设新密码' : '用注册时保存的恢复码设新密码'),
+    recoverTabs(),
+    ls.via === 'email' ? emailResetBody() : codeResetBody(),
     h('button', { class: 'link', style: 'font-size:12px;margin-top:10px', onclick: () => set({ mode: 'login', err: '', password: '', password2: '' }) }, '← 返回登录')
   );
 }

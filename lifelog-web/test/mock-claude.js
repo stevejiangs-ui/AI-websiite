@@ -118,7 +118,19 @@
     }
   };
 
-  const caps = { db, user, sample, downloads };
+  /* Gmail：记录发出的邮件；window.__mailFail = 'needs_reauth' 可模拟失败 */
+  window.__mockCalls.mail = [];
+  const mcp = {
+    callTool: async (server, tool, input) => {
+      await new Promise((r) => setTimeout(r, 60));
+      if (window.__mailFail) throw { code: window.__mailFail, message: 'mock fail' };
+      if (server !== 'Gmail' || tool !== 'send_message') throw { code: 'not_in_manifest', message: server + '/' + tool };
+      window.__mockCalls.mail.push(JSON.parse(JSON.stringify(input)));
+      return { payload: { id: 'm' + Date.now(), threadId: 't1', labelIds: ['SENT'] } };
+    }
+  };
+
+  const caps = { db, user, sample, downloads, mcp };
   window.claude = {
     use: (name) => new Promise((r) => setTimeout(() => r(caps[name] || null), 80))
   };

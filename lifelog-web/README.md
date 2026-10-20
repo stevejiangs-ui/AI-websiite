@@ -8,7 +8,7 @@
 | | 旧版 | 整理版 |
 |---|---|---|
 | 托管 | life-ledger-17434.app.workbuddy.host | claude.ai artifact（私有链接） |
-| 登录 | 邮箱 + 密码，邮箱验证码找回 | 邮箱 + 密码，10 分钟无操作自动退出；忘记密码用**恢复码**重设（沙盒里不能发邮件） |
+| 登录 | 邮箱 + 密码，邮箱验证码找回 | 邮箱 + 密码，10 分钟无操作自动退出；忘记密码用**邮箱验证码**重设（经你连接的 Gmail 发信），恢复码作备用 |
 | 数据 | WorkBuddy 云数据库 | claude.ai 应用数据库，存在 `data/users/<你的id>/` 私有目录，分享链接别人也看不到 |
 | AI | WorkBuddy 的 GLM / Kimi / DeepSeek | Claude（用你自己的额度，首次使用会弹授权） |
 | 构建 | Vite + npm 依赖 | esbuild 一条命令，产物单文件 |
@@ -22,7 +22,8 @@ index.html        页面壳（启动画面），构建时把 CSS/JS 内联进来
 style.css         全部样式（文件末尾「整理版补丁」是手机适配）
 build.mjs         构建脚本 → dist/个人APP.html
 src/
-  auth.js         ★ 登录：注册 / 登录 / 恢复码重设 / 改密码 / 闲置退出（PBKDF2 哈希）
+  mailer.js       发验证码邮件（Gmail 连接器）
+  auth.js         ★ 登录：注册 / 登录 / 邮箱验证码重设 / 恢复码重设 / 改密码 / 闲置退出（PBKDF2 哈希）
   view-login.js   登录界面
   backend.js      ★ 数据后端：Supabase 风格查询 → claude.ai db / 本机 localStorage；AI → Claude
   cloud.js        业务数据函数（日记、账单、待办、目标、人物、生辰…）
@@ -51,7 +52,8 @@ npm run e2e            # 端到端：登录/恢复码/闲置退出、男女命�
 
 ## 登录说明（auth.js）
 
-- 第一次打开注册：邮箱 + 密码，同时生成 16 位恢复码（只显示一次）。
+- 第一次打开注册：邮箱 + 密码，同时生成 16 位恢复码（只显示一次，作备用）。
+- 忘记密码：给注册邮箱发 6 位验证码（10 分钟有效，错 5 次作废，60 秒内不能重发），通过 claude.ai 连接的 Gmail `send_message` 发出（`src/mailer.js`）。验证码只存哈希。
 - 密码和恢复码只存 PBKDF2-SHA256 哈希（加盐、15 万次迭代），在 `data/users/<uid>/auth`。
 - 每台设备单独登录；连续 10 分钟无操作自动退出（回到页面时按时间戳补算）。
 - 连续输错 5 次锁 30 秒，之后翻倍，最长 15 分钟。

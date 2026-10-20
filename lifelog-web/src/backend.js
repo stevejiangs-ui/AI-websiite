@@ -44,6 +44,7 @@ export const runtime = {
   db: null,
   sample: null,
   downloads: null,
+  mcp: null,
   isOwner: false
 };
 
@@ -57,13 +58,15 @@ export function backendReady() {
 async function init() {
   const hasClaude = typeof window !== 'undefined' && window.claude && typeof window.claude.use === 'function';
   if (!hasClaude) return runtime;
-  const [db, user, sample, downloads] = await Promise.all([
+  const [db, user, sample, downloads, mcp] = await Promise.all([
     useCap('db'),
     useCap('user'),
     useCap('sample'),
-    useCap('downloads')
+    useCap('downloads'),
+    useCap('mcp')
   ]);
   runtime.sample = sample || null;
+  runtime.mcp = mcp || null;
   runtime.downloads = downloads || null;
   if (user) {
     try {

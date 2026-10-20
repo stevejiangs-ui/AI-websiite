@@ -224,6 +224,70 @@ export async function resetWithCode(email, code, newPassword) {
   return next;
 }
 
+/* ---------- 邮箱验证码找回 ----------
+   6 位数字，10 分钟有效，最多试 5 次，60 秒内不能重发。
+   验证码只存哈希；发信失败会撤销这次验证码。 */
+
+const OTP_TTL = 10 * 60 * 1000;
+const OTP_COOLDOWN = 60 * 1000;
+const OTP_TRIES = 5;
+
+export function resendWaitMs() {
+  const sent = cached?.otp?.sent_at || 0;
+  return Math.max(0, sent + OTP_COOLDOWN - Date.now());
+}
+
+/** 生成验证码并用 send(email, code) 发出去。返回实际发往的邮箱。 */
+export async function requestEmailCode(email, send) {
+  checkLock();
+  const rec = await loadAccount();
+  if (!rec) throw new Error('还没有注册账号');
+  if (!same(normEmail(email), rec.email)) {
+    noteFail();
+    throw new Error('这不是注册时用的邮箱');
+  }
+  const wait = resendWaitMs();
+  if (wait > 0) throw new Error(`请 ${Math.ceil(wait / 1000)} 秒后再重新发送`);
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  const code = String(n).padStart(6, '0');
+  const salt = randomHex(16);
+  const otp = { salt, hash: await pbkdf2(code, salt, 20000), exp: Date.now() + OTP_TTL, tries: 0, sent_at: Date.now() };
+  await saveAccount({ ...rec, otp });
+  try {
+    await send(rec.email, code);
+  } catch (e) {
+    const { otp: _drop, ...rest } = cached;
+    await saveAccount(rest).catch(() => {});
+    throw e;
+  }
+  return rec.email;
+}
+
+/** 邮箱 + 验证码 + 新密码 → 重设并登录 */
+export async function resetWithEmailCode(email, code, newPassword) {
+  checkLock();
+  checkPassword(newPassword);
+  const rec = await loadAccount();
+  if (!rec) throw new Error('还没有注册账号');
+  if (!same(normEmail(email), rec.email)) throw new Error('这不是注册时用的邮箱');
+  const otp = rec.otp;
+  if (!otp) throw new Error('请先点「发送验证码」');
+  if (Date.now() > otp.exp) throw new Error('验证码已过期，请重新发送');
+  if (otp.tries >= OTP_TRIES) throw new Error('验证码输错太多次已失效，请重新发送');
+  const clean = String(code || '').replace(/\D/g, '');
+  if (!same(await pbkdf2(clean, otp.salt, 20000), otp.hash)) {
+    noteFail();
+    await saveAccount({ ...rec, otp: { ...otp, tries: otp.tries + 1 } });
+    const left = OTP_TRIES - otp.tries - 1;
+    throw new Error(left > 0 ? `验证码不对，还能再试 ${left} 次` : '验证码输错太多次已失效，请重新发送');
+  }
+  clearFail();
+  const salt = randomHex(16);
+  const { otp: _used, ...rest } = rec;
+  await saveAccount({ ...rest, salt, hash: await pbkdf2(newPassword, salt), iter: ITER, updated_at: new Date().toISOString() });
+  startSession();
+}
+
 /** 已登录状态下改密码（要验证旧密码） */
 export async function changePassword(oldPassword, newPassword) {
   checkLock();
