@@ -1,5 +1,5 @@
 import { cloud } from './cloud.js';
-import { runtime, ALL_TABLES } from './backend.js';
+import { runtime, ALL_TABLES } from '@platform';
 import { FACETS, GOAL_CATEGORIES, entryFacets, facetLabels, goalCatOf } from './facets.js';
 
 /* ---------------- 全量导出 ---------------- */

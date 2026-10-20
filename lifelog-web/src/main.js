@@ -21,8 +21,20 @@ import { peopleView, loadPeople } from './view-people.js';
 import { placeView, loadPlaces } from './view-place.js';
 import { EXPERTS } from './experts.js';
 import { ensureModel } from './ai.js';
-import { backendReady, runtime } from './backend.js';
-import { loadAccount, sessionValid, hasSession, markActive, endSession, lastActiveAt, IDLE_LIMIT_MS } from './auth.js';
+import {
+  PLATFORM,
+  backendReady,
+  runtime,
+  loadAccount,
+  sessionValid,
+  hasSession,
+  markActive,
+  endSession,
+  lastActiveAt,
+  IDLE_LIMIT_MS,
+  touchSession,
+  signOutRemote
+} from '@platform';
 import { setupLogin, loginView } from './view-login.js';
 
 const root = document.getElementById('app');
@@ -415,10 +427,7 @@ async function boot() {
     setStatus('正在连接数据…');
     await backendReady();
     const acct = await loadAccount();
-    state.session = {
-      accessToken: 'claude',
-      user: { id: runtime.uid || 'local', name: runtime.name || '我', email: acct?.email || runtime.email || '' }
-    };
+    state.session = makeSession(acct);
     if (acct && sessionValid()) {
       await enterApp();
     } else {
@@ -432,6 +441,8 @@ async function boot() {
       /* 本机有会话但已超时：也算「自动退出」 */
       if (acct && hasSession() && !reason) reason = 'idle';
       endSession();
+      /* 云端会话也一并结束（WorkBuddy）；不等它，登录页先出来 */
+      signOutRemote();
       showLogin(!!acct, reason);
     }
     markBooted();
@@ -440,13 +451,20 @@ async function boot() {
   }
 }
 
+function makeSession(acct) {
+  return {
+    accessToken: PLATFORM,
+    user: { id: runtime.uid || 'local', name: runtime.name || '我', email: acct?.email || runtime.email || '' }
+  };
+}
+
 function showLogin(hasAccount, reason) {
   setupLogin({
     hasAccount,
     reason,
     enter: async () => {
       const acct = await loadAccount();
-      if (state.session?.user) state.session.user.email = acct?.email || '';
+      state.session = makeSession(acct);
       await enterApp();
     }
   });
@@ -467,7 +485,8 @@ function signOut(reason) {
   } catch (e) {
     /* ignore */
   }
-  location.reload();
+  /* 云端退出最多等 1.5 秒：断网也必须能退出 */
+  Promise.race([Promise.resolve(signOutRemote()), new Promise((r) => setTimeout(r, 1500))]).finally(() => location.reload());
 }
 
 function inApp() {
@@ -487,7 +506,10 @@ function guardIdle() {
   window.addEventListener(
     ev,
     () => {
-      if (!guardIdle() && hasSession()) markActive();
+      if (!guardIdle() && hasSession()) {
+        markActive();
+        touchSession();
+      }
     },
     { passive: true, capture: true }
   )
@@ -558,3 +580,17 @@ window.addEventListener('unhandledrejection', (ev) => {
 mountRender(root);
 setStatus('JS 已加载');
 boot();
+
+/* PWA（仅 WorkBuddy 独立网站）：注册 Service Worker，加到主屏幕后全屏、断网能看到壳。
+   页面一律网络优先，不会因为缓存拿到旧版。claude.ai 里不能用 Service Worker。 */
+if (PLATFORM === 'workbuddy' && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./sw.js')
+      .then((reg) => {
+        reg.update().catch(() => {});
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      })
+      .catch(() => {});
+  });
+}

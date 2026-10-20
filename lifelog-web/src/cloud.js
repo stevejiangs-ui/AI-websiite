@@ -1,6 +1,6 @@
 /* 数据后端：原来是 WorkBuddy 云 SDK，现在换成 backend.js（claude.ai 云端同步 / 本机存储）。
    backend.js 对外的形状与原 SDK 一致，下面所有函数无需改动。 */
-import { cloud, backendReady, runtime } from './backend.js';
+import { cloud, backendReady, runtime } from '@platform';
 export { cloud };
 
 /** 解包 { data, error } */
@@ -489,10 +489,24 @@ export async function deleteTask(id) {
 }
 
 /** 当前账号 id。写入时显式带上 owner_id。
-    （原版还支持「配对码关联多个登录身份」，在 claude.ai 里只有一个账号，已去掉。） */
+    若这个登录身份在 account_links 里登记为某个主账号的成员（旧版 WorkBuddy 的
+    「配对码关联」功能），返回主账号 id，这样所有写入仍归到同一个账本。缓存 60 秒。 */
+let ownerCache = { uid: '', owner: '', at: 0 };
 async function currentUserId() {
   await backendReady();
-  return runtime.uid || 'local';
+  const uid = runtime.uid;
+  if (!uid) return 'local';
+  const now = Date.now();
+  if (ownerCache.uid === uid && now - ownerCache.at < 60000) return ownerCache.owner;
+  let owner = uid;
+  try {
+    const rows = unwrap(await cloud.database.from('account_links').select('owner').eq('member', uid).limit(1));
+    if (Array.isArray(rows) && rows[0]?.owner) owner = rows[0].owner;
+  } catch (e) {
+    /* 表不存在或未关联 → 就用自己 */
+  }
+  ownerCache = { uid, owner, at: now };
+  return owner;
 }
 
 export async function saveGoal(g) {

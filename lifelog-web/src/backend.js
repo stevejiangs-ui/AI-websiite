@@ -45,6 +45,7 @@ export const runtime = {
   sample: null,
   downloads: null,
   mcp: null,
+  aiAvailable: false,
   isOwner: false
 };
 
@@ -66,6 +67,7 @@ async function init() {
     useCap('mcp')
   ]);
   runtime.sample = sample || null;
+  runtime.aiAvailable = !!sample;
   runtime.mcp = mcp || null;
   runtime.downloads = downloads || null;
   if (user) {
@@ -682,22 +684,8 @@ export const cloud = {
 
 /* ---------------- 备份恢复 / 清空 ---------------- */
 
-export const ALL_TABLES = [
-  'entries',
-  'todos',
-  'transactions',
-  'rules',
-  'goals',
-  'tasks',
-  'budgets',
-  'accounts',
-  'birth_info',
-  'people',
-  'self_profile',
-  'places',
-  'looks',
-  'bazi_qa'
-];
+import { ALL_TABLES } from './tables.js';
+export { ALL_TABLES };
 
 /** 把一份 JSON 备份（本应用或旧版 WorkBuddy 版导出的）写进当前存储。
     同 id 的行会被覆盖，不会重复。 */

@@ -15,13 +15,14 @@ export async function ensureModel() {
   if (modelId) return modelId;
   const models = await cloud.llm.models.list().catch(() => []);
   const usable = models.filter((m) => m.disabled !== true && m.enabled !== false);
-  const GOOD = ['claude'];
+  /* 按优先级挑：claude.ai 版只有 claude；WorkBuddy 版是国产模型 */
+  const GOOD = ['claude', 'glm-5.3', 'kimi-k3-1', 'deepseek-v4-pro', 'hy3', 'glm-5.2', 'minimax-m3'];
   const chosen =
     usable.find((m) => GOOD.includes(m.id)) ||
     usable.find((m) => m.isDefault) ||
     usable[0] ||
     null;
-  if (!chosen) throw new Error('AI 只在 claude.ai 里打开时可用');
+  if (!chosen) throw new Error('当前没有可用的 AI 模型');
   modelId = chosen.id;
   return modelId;
 }
@@ -29,7 +30,7 @@ export async function ensureModel() {
 /* 结构化提炼用的模型：要快、要听话输出 JSON。
    推理型模型（如 hy4-preview）会把大量 token 花在 reasoning 上，content 很久不来，
    用于「保存后立即提炼」这种前台等待的场景体验很差，所以单独挑一个非推理小模型。 */
-const FAST_MODELS = ['claude-quick'];
+const FAST_MODELS = ['claude-quick', 'glm-5.3-flash', 'glm-4.7', 'glm-4.6', 'deepseek-v4-flash', 'hunyuan-chat', 'minimax-m2.5', 'kimi-k2.6'];
 
 export async function ensureFastModel() {
   if (fastModelId) return fastModelId;
@@ -51,7 +52,14 @@ export function modelLabel() {
 
 const MODEL_NAMES = {
   claude: 'Claude',
-  'claude-quick': 'Claude（快速）'
+  'claude-quick': 'Claude（快速）',
+  'glm-5.3': 'GLM-5.3',
+  'kimi-k3-1': 'Kimi-K3',
+  'deepseek-v4-pro': 'DeepSeek-V4-Pro',
+  hy3: 'Hy3',
+  'glm-5.2': 'GLM-5.2',
+  'minimax-m3': 'MiniMax-M3',
+  auto: 'Auto'
 };
 
 export function modelDisplayName() {

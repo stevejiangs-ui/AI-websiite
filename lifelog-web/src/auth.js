@@ -15,14 +15,29 @@
    ============================================================ */
 
 import { backendReady, runtime } from './backend.js';
+import {
+  IDLE_LIMIT_MS,
+  EMAIL_RE,
+  normEmail,
+  safeGet,
+  safeSet,
+  startSession as startLocalSession,
+  sessionEmail,
+  hasSession,
+  markActive,
+  lastActiveAt,
+  idleExpired,
+  endLocalSession,
+  lockedForMs,
+  noteFail,
+  clearFail,
+  checkLock
+} from './session.js';
+
+export { IDLE_LIMIT_MS, EMAIL_RE, hasSession, markActive, lastActiveAt, lockedForMs };
 
 const LOCAL_KEY = 'lifelog.auth.v1';
-const SESSION_KEY = 'lifelog.session.v1';
-const ACTIVE_KEY = 'lifelog.active.v1';
-const FAIL_KEY = 'lifelog.authfail.v1';
 const ITER = 150000;
-
-export const IDLE_LIMIT_MS = 10 * 60 * 1000;
 
 /* ---------- 小工具 ---------- */
 
@@ -48,8 +63,6 @@ function same(a, b) {
   return x === 0;
 }
 
-export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const normEmail = (e) => String(e || '').trim().toLowerCase();
 
 /* 恢复码：16 位，去掉易混字符（0/O、1/I/L），四位一组 */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -59,28 +72,6 @@ function newRecoveryCode() {
   return chars.match(/.{4}/g).join('-');
 }
 const normCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-function safeGet(k) {
-  try {
-    return localStorage.getItem(k);
-  } catch (e) {
-    return null;
-  }
-}
-function safeSet(k, v) {
-  try {
-    localStorage.setItem(k, v);
-  } catch (e) {
-    /* 无痕模式等：退化为本次打开有效 */
-  }
-}
-function safeDel(k) {
-  try {
-    localStorage.removeItem(k);
-  } catch (e) {
-    /* ignore */
-  }
-}
 
 /* ---------- 账号记录读写 ---------- */
 
@@ -113,40 +104,6 @@ async function saveAccount(rec) {
 
 export function accountEmail() {
   return cached?.email || '';
-}
-
-/* ---------- 输错限流 ----------
-   连错 5 次锁 30 秒，再错继续翻倍（上限 15 分钟）。记在本机。 */
-
-function failState() {
-  try {
-    return JSON.parse(safeGet(FAIL_KEY) || '{"n":0,"until":0}');
-  } catch (e) {
-    return { n: 0, until: 0 };
-  }
-}
-
-export function lockedForMs() {
-  return Math.max(0, failState().until - Date.now());
-}
-
-function noteFail() {
-  const f = failState();
-  f.n += 1;
-  if (f.n >= 5) {
-    const step = Math.min(15 * 60 * 1000, 30000 * 2 ** (f.n - 5));
-    f.until = Date.now() + step;
-  }
-  safeSet(FAIL_KEY, JSON.stringify(f));
-}
-
-function clearFail() {
-  safeDel(FAIL_KEY);
-}
-
-function checkLock() {
-  const ms = lockedForMs();
-  if (ms > 0) throw new Error(`输错次数太多，请 ${Math.ceil(ms / 1000)} 秒后再试`);
 }
 
 /* ---------- 注册 / 登录 / 重设 ---------- */
@@ -334,36 +291,15 @@ export async function regenerateRecovery(password) {
 /* ---------- 会话（只在这台设备、这个浏览器有效） ---------- */
 
 function startSession() {
-  const now = Date.now();
-  safeSet(SESSION_KEY, JSON.stringify({ email: cached?.email || '', at: now }));
-  safeSet(ACTIVE_KEY, String(now));
-}
-
-export function markActive() {
-  if (safeGet(SESSION_KEY)) safeSet(ACTIVE_KEY, String(Date.now()));
-}
-
-export function lastActiveAt() {
-  return Number(safeGet(ACTIVE_KEY) || 0) || 0;
+  startLocalSession(cached?.email || '');
 }
 
 /** 本机是否有有效会话：登录过、账号邮箱没变、没有超过 10 分钟不操作 */
 export function sessionValid() {
-  let s = null;
-  try {
-    s = JSON.parse(safeGet(SESSION_KEY) || 'null');
-  } catch (e) {
-    s = null;
-  }
-  if (!s || !cached || s.email !== cached.email) return false;
-  return Date.now() - lastActiveAt() < IDLE_LIMIT_MS;
-}
-
-export function hasSession() {
-  return !!safeGet(SESSION_KEY);
+  if (!hasSession() || !cached || sessionEmail() !== cached.email) return false;
+  return !idleExpired();
 }
 
 export function endSession() {
-  safeDel(SESSION_KEY);
-  safeDel(ACTIVE_KEY);
+  endLocalSession();
 }

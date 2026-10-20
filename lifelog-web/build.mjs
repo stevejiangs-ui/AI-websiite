@@ -1,5 +1,6 @@
-/* 构建：把整个应用打成一个自包含的 HTML 文件（dist/个人APP.html）。
+/* claude.ai 版构建：把整个应用打成一个自包含的 HTML 文件（dist/个人APP.html）。
    用法：node build.mjs
+   （WorkBuddy 版用 Vite：npm run build:wb，见 vite.config.js）
    需要 esbuild（npm i -D esbuild，或任何能 import 到 esbuild 的环境）。 */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -22,6 +23,7 @@ const result = await esbuild.build({
   outdir: 'dist',
   loader: { '.css': 'css' },
   legalComments: 'none',
+  alias: { '@platform': './src/platform-claude.js' },
   charset: 'utf8'
 });
 
@@ -35,6 +37,8 @@ for (const f of result.outputFiles) {
 
 const shell = readFileSync('index.html', 'utf8');
 const html = shell
+  .replace(/\s*<!-- PWA[^\n]*\n(\s*<link[^\n]*\n){3}/, '\n')
+  .replace(/\s*<!-- Vite[^\n]*\n\s*<script type="module"[^\n]*<\/script>/, '')
   .replace('<!--INLINE_CSS-->', () => `<style>${css}</style>`)
   .replace('<!--INLINE_JS-->', () => `<script>${js.replace(/<\/script/gi, '<\\/script')}</script>`);
 

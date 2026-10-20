@@ -1,0 +1,22 @@
+{
+  "name": "个人APP",
+  "short_name": "个人APP",
+  "description": "日记、账单、八字、目标与日程，一个地方全都有。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf8f5",
+  "theme_color": "#23211d",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "记一笔日记", "url": "./index.html#diary" },
+    { "name": "看看运势", "url": "./index.html#fortune" },
+    { "name": "今天的任务", "url": "./index.html#goals" }
+  ]
+}

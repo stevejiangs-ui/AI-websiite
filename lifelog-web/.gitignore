@@ -1,11 +1,7 @@
 node_modules
 dist
-web/assets
-web/index.html
-web/manifest.webmanifest
-web/sw.js
-web/icon-*.png
-web/apple-touch-icon.png
+web/
+test/shots/
+test/wb-dist/
 .DS_Store
 *.zip
-web/

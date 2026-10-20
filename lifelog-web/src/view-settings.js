@@ -1,14 +1,26 @@
 import { h, render, toast, state, ask } from './store.js';
 import { getSelfProfile, saveSelfProfile, loadRules } from './cloud.js';
 import { ensureModel, modelLabel } from './ai.js';
-import { runtime, restoreTables, invalidateAll, ALL_TABLES } from './backend.js';
-import { accountEmail, changePassword, changeEmail, regenerateRecovery, IDLE_LIMIT_MS } from './auth.js';
+import {
+  PLATFORM,
+  PLATFORM_LABEL,
+  authFeatures,
+  runtime,
+  restoreTables,
+  invalidateAll,
+  ALL_TABLES,
+  accountEmail,
+  changePassword,
+  changeEmail,
+  regenerateRecovery,
+  IDLE_LIMIT_MS
+} from '@platform';
 
 import { collectAll, download, stamp, entriesCsv, txCsv, toPlainText } from './exporter.js';
 
 /* 设置页（整理版）
    原版的「邮箱密码登录 / 修改密码 / 10 分钟自动登出」都依附在 WorkBuddy 云账号上，
-   现在应用跑在 claude.ai 里，登录就是你的 Claude 账号，这几块已经去掉。 */
+   现在按平台区分：claude.ai 版 / WorkBuddy 版，登录与存储由 @platform 提供。 */
 
 /* ---------- 昵称 ---------- */
 
@@ -201,9 +213,9 @@ function securityCard() {
     'div',
     { class: 'card' },
     h('h3', { class: 'card-title' }, '登录与安全'),
-    row('登录邮箱', accountEmail(), 'email', '修改'),
+    authFeatures.changeEmail ? row('登录邮箱', accountEmail(), 'email', '修改') : h('div', { class: 'row-between', style: 'padding:10px 0;border-top:1px solid var(--line)' }, h('div', {}, h('div', { style: 'font-size:13px;font-weight:500' }, '登录邮箱'), h('div', { class: 'muted', style: 'font-size:12px;word-break:break-all' }, accountEmail() || '—'))),
     row('登录密码', '••••••', 'pass', '修改密码'),
-    row('恢复码', '忘记密码时用来重设', 'code', '重新生成'),
+    authFeatures.recoveryCode ? row('恢复码', '忘记密码时用来重设', 'code', '重新生成') : null,
     secForm(),
     sec.err ? h('div', { class: 'err' }, sec.err) : null,
     sec.code
@@ -239,7 +251,15 @@ function storageCard() {
     'div',
     { class: 'card' },
     h('h3', { class: 'card-title' }, '数据存储', h('span', { class: 'store-badge' + (cloudMode ? ' ok' : '') }, cloudMode ? '● 云端同步' : '● 仅本机')),
-    cloudMode
+    cloudMode && PLATFORM === 'workbuddy'
+      ? h(
+          'div',
+          { class: 'muted', style: 'line-height:1.9' },
+          '数据存在 WorkBuddy（腾讯）云数据库里，按账号隔离，只有你自己的账号能读写。国内可以直接访问。',
+          h('br'),
+          '手机和电脑登录同一个账号就是同一份数据。'
+        )
+      : cloudMode
       ? h(
           'div',
           { class: 'muted', style: 'line-height:1.9' },
@@ -254,7 +274,9 @@ function storageCard() {
           h('br'),
           '在 claude.ai 里打开这个应用（手机上用 Claude App 或浏览器均可），即可开启云端同步。'
         ),
-    h(
+    PLATFORM === 'workbuddy'
+      ? null
+      : h(
       'div',
       { class: 'row', style: 'gap:8px;margin-top:12px;flex-wrap:wrap' },
       h(
@@ -397,13 +419,15 @@ export function settingsView() {
       h(
         'div',
         { class: 'row-between' },
-        h('div', { class: 'muted' }, state.aiOk ? `可用 · ${modelLabel()}` : runtime.sample ? '首次使用 AI 时会请你授权' : '本机模式下不可用'),
+        h('div', { class: 'muted' }, state.aiOk ? `可用 · ${modelLabel()}` : runtime.aiAvailable ? (PLATFORM === 'claude' ? '首次使用 AI 时会请你授权' : '首次使用 AI 时自动连接') : '本机模式下不可用'),
         h('button', { class: 'btn btn-sm btn-ghost', onclick: testAI }, '检查')
       ),
       h(
         'div',
         { class: 'muted', style: 'font-size:12px;line-height:1.8;margin-top:10px' },
-        'AI 问答、日记提炼、账单分类、命理分析都用你自己的 Claude 额度。提问时会把相关的日记摘要和收支统计一起发给 Claude 作为参考，不会用于其他用途。'
+        PLATFORM === 'claude'
+          ? 'AI 问答、日记提炼、账单分类、命理分析都用你自己的 Claude 额度。提问时会把相关的日记摘要和收支统计一起发给 Claude 作为参考，不会用于其他用途。'
+          : 'AI 问答、日记提炼、账单分类、命理分析使用 WorkBuddy 提供的国产大模型（自动挑选可用的一个）。提问时会把相关的日记摘要和收支统计一起发给模型作为参考。'
       )
     ),
 
@@ -549,7 +573,38 @@ function step(n, text) {
   return h('div', { class: 'ins-step' }, h('span', { class: 'ins-n' }, String(n)), h('span', {}, text));
 }
 
+const WB_URL = 'https://life-ledger-17434.app.workbuddy.host/';
+
+function wbInstallCard() {
+  const ios = isIOS();
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(WB_URL);
+      toast('链接已复制');
+    } catch (e) {
+      toast('复制失败，请长按链接手动复制', 'err');
+    }
+  };
+  return h(
+    'div',
+    { class: 'card' },
+    h('h3', { class: 'card-title' }, '在手机 / 微信里用'),
+    h('div', { class: 'muted', style: 'line-height:1.8;margin-bottom:12px' }, '不需要下载安装，国内直接打开。加到主屏幕后点图标就是全屏，跟普通 App 一样。'),
+    h('div', { class: 'ins-url' }, h('span', { class: 'ins-url-t' }, WB_URL), h('button', { class: 'btn btn-sm btn-ghost', onclick: copy }, '复制链接')),
+    h('div', { style: 'font-size:13px;font-weight:500;margin:14px 0 8px' }, ios ? 'iPhone：Safari 加到主屏幕' : '安卓：浏览器加到主屏幕'),
+    ios
+      ? h('div', {}, step(1, '用 Safari 打开上面的网址'), step(2, '点底部「分享」按钮（方框 + 向上箭头）'), step(3, '选「添加到主屏幕」，再点「添加」'))
+      : h('div', {}, step(1, '用 Chrome / 系统浏览器打开上面的网址'), step(2, '点右上角「⋮」菜单'), step(3, '选「添加到主屏幕」或「安装应用」')),
+    h(
+      'div',
+      { class: 'muted', style: 'font-size:12px;line-height:1.8;margin-top:12px' },
+      '微信里：把链接发给「文件传输助手」，点开就能用。想加到桌面，先点右上角「…」→「在浏览器打开」。'
+    )
+  );
+}
+
 function installCard() {
+  if (PLATFORM === 'workbuddy') return wbInstallCard();
   const ios = isIOS();
   return h(
     'div',

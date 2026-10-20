@@ -1,7 +1,19 @@
 /* 登录界面：注册（首次）/ 登录 / 忘记密码（恢复码）/ 显示恢复码 */
 import { h, render, toast } from './store.js';
-import { register, login, resetWithCode, requestEmailCode, resetWithEmailCode, resendWaitMs, accountEmail, lockedForMs, EMAIL_RE, IDLE_LIMIT_MS } from './auth.js';
-import { sendCodeEmail } from './mailer.js';
+import {
+  PLATFORM_LABEL,
+  authFeatures,
+  register,
+  login,
+  resetWithCode,
+  requestEmailCode,
+  resetWithEmailCode,
+  resendWaitMs,
+  accountEmail,
+  lockedForMs,
+  EMAIL_RE,
+  IDLE_LIMIT_MS
+} from '@platform';
 
 let ls = {
   mode: 'login', // register | login | recover | code
@@ -34,7 +46,7 @@ let onEnter = () => {};
 
 export function setupLogin({ hasAccount, reason, enter }) {
   onEnter = enter;
-  ls = { ...ls, mode: hasAccount ? 'login' : 'register', email: hasAccount ? accountEmail() : '', err: '', busy: false };
+  ls = { ...ls, mode: hasAccount || !authFeatures.register ? 'login' : 'register', email: accountEmail() || '', err: '', busy: false };
   ls.hint = reason === 'idle' ? `已经 ${IDLE_LIMIT_MS / 60000} 分钟没有操作，为安全起见自动退出了，重新输入密码就能进。` : '';
 }
 
@@ -83,7 +95,7 @@ async function run(fn) {
 function submit() {
   if (ls.mode === 'register') return doRegister();
   if (ls.mode === 'login') return doLogin();
-  if (ls.mode === 'recover') return ls.via === 'email' ? doEmailReset() : doRecover();
+  if (ls.mode === 'recover') return ls.via === 'email' || !authFeatures.recoveryCode ? doEmailReset() : doRecover();
   return null;
 }
 
@@ -130,7 +142,7 @@ async function sendCode() {
   render();
   try {
     if (!EMAIL_RE.test(ls.email.trim())) throw new Error('请输入正确的邮箱地址');
-    ls.sentTo = await requestEmailCode(ls.email, sendCodeEmail);
+    ls.sentTo = await requestEmailCode(ls.email);
     startTick();
   } catch (e) {
     ls.err = (e && e.message) || String(e);
@@ -187,7 +199,7 @@ function loginCard() {
     'div',
     { class: 'login-card' },
     h('h2', {}, '登录'),
-    h('p', { class: 'sub' }, '使用邮箱和密码登录'),
+    h('p', { class: 'sub' }, authFeatures.register ? '使用邮箱和密码登录' : `使用 ${PLATFORM_LABEL} 账号的邮箱和密码登录`),
     ls.hint ? h('div', { class: 'ok-msg' }, ls.hint) : null,
     input('login-email', '邮箱', 'email', { type: 'email', placeholder: 'you@example.com', autocomplete: 'username', inputmode: 'email', autocapitalize: 'off' }),
     input('login-pass', '密码', 'password', { type: 'password', placeholder: '登录密码', autocomplete: 'current-password' }),
@@ -203,6 +215,7 @@ function loginCard() {
 }
 
 function recoverTabs() {
+  if (!authFeatures.recoveryCode) return h('div', { style: 'height:6px' });
   const tab = (k, label) =>
     h('button', { class: ls.via === k ? 'on' : '', onclick: () => set({ via: k, err: '' }) }, label);
   return h('div', { class: 'seg', style: 'margin:4px 0 14px' }, tab('email', '邮箱验证码'), tab('code', '恢复码'));
@@ -232,7 +245,13 @@ function emailResetBody() {
       : null,
     errBox(),
     ls.sentTo ? primary('重设密码并登录') : null,
-    h('p', { class: 'hint' }, '验证码会从你在 claude.ai 连接的 Gmail 发出，第一次发送时会弹窗请你允许。')
+    h(
+      'p',
+      { class: 'hint' },
+      authFeatures.recoveryCode
+        ? '验证码会从你在 claude.ai 连接的 Gmail 发出，第一次发送时会弹窗请你允许。'
+        : `验证码由 ${PLATFORM_LABEL} 发到你的账号邮箱，每分钟最多发一次。`
+    )
   );
 }
 
@@ -257,7 +276,7 @@ function recoverCard() {
     h('h2', {}, '找回密码'),
     h('p', { class: 'sub' }, ls.via === 'email' ? '给注册邮箱发验证码，验证后设新密码' : '用注册时保存的恢复码设新密码'),
     recoverTabs(),
-    ls.via === 'email' ? emailResetBody() : codeResetBody(),
+    ls.via === 'email' || !authFeatures.recoveryCode ? emailResetBody() : codeResetBody(),
     h('button', { class: 'link', style: 'font-size:12px;margin-top:10px', onclick: () => set({ mode: 'login', err: '', password: '', password2: '' }) }, '← 返回登录')
   );
 }
