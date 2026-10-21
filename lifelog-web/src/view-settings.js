@@ -17,6 +17,7 @@ import {
 } from '@platform';
 
 import { collectAll, download, stamp, entriesCsv, txCsv, toPlainText } from './exporter.js';
+import { toResearchMarkdown, DECISION_TAG } from './research-export.js';
 
 /* 设置页（整理版）
    原版的「邮箱密码登录 / 修改密码 / 10 分钟自动登出」都依附在 WorkBuddy 云账号上，
@@ -464,7 +465,18 @@ function exportCard() {
     ),
     h(
       'div',
+      { class: 'hint', style: 'line-height:1.8;margin-bottom:12px' },
+      `做重要决定时写一篇日记、标签填「${DECISION_TAG}」，事后补上结果；「给 Claude 研究」会把它们单独列出来。`
+    ),
+    h(
+      'div',
       { class: 'export-grid' },
+      h(
+        'button',
+        { class: 'export-item', disabled: busy, onclick: () => doExport('research') },
+        h('b', {}, '给 Claude 研究'),
+        h('span', {}, '一份 Markdown：全部板块 + 按月汇总 + 决策记录，上传到 Claude 项目')
+      ),
       h(
         'button',
         { class: 'export-item', disabled: busy, onclick: () => doExport('json') },
@@ -547,6 +559,9 @@ async function doExport(kind) {
       // 两个文件连续下载，错开一点避免浏览器拦截
       await new Promise((r) => setTimeout(r, 400));
       await download(`个人APP-账单-${ts}.csv`, txCsv(bundle.data.transactions), 'text/csv;charset=utf-8');
+    } else if (kind === 'research') {
+      const month = new Date().toISOString().slice(0, 7);
+      await download(`个人APP-研究资料-${month}.md`, toResearchMarkdown(bundle), 'text/markdown;charset=utf-8');
     } else {
       const text = toPlainText(bundle);
       exportState.text = text;
