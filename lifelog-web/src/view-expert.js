@@ -8,8 +8,6 @@ import { EXPERTS, expertOf } from './experts.js';
 import { ensureBirth } from './view-fortune.js';
 import { baziOf, dailyFortune } from './bazi.js';
 import { favorableGods, periodFortune, applyAdvice } from './yongshen.js';
-import { listNews } from './cloud.js';
-import { newsDigestText } from './news.js';
 
 let drafts = '';
 let controller = null;
@@ -120,17 +118,6 @@ async function loadExpertData(id) {
     ]);
     const stats = tx.length ? computeStats(tx) : null;
     return await buildContextData({ entries: entries || [], stats, month });
-  }
-
-  /* 经济与房产顾问：带上「新闻关注」里收藏的新闻，每个话题最近几条 */
-  if (e.data === 'news') {
-    try {
-      const rows = await listNews();
-      if (!rows || !rows.length) return '（用户还没在「新闻关注」里收藏新闻。回答时说明没有新闻依据，只能讲一般背景，并建议去「新闻关注」页一键搜最新消息后收藏。）';
-      return '用户收藏的新闻（日期为收藏日期）：\n' + newsDigestText(rows, { perTopic: 8 });
-    } catch (err) {
-      return '（新闻读取失败，请基于一般背景回答，并说明不是最新消息）';
-    }
   }
 
   if (e.data === 'goals') {

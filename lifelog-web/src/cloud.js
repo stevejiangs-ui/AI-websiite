@@ -808,14 +808,9 @@ export function signalArea(k) {
 }
 
 export async function listSignals() {
-  /* 新闻关注也存在这张表里（source 以「关注:」开头），一起读出来再由页面分开，
-     上限放宽到 1000，免得新闻多了把老的利好消息挤出列表 */
+  /* 旧版「新闻关注」的条目也在这张表里（source 以「关注:」开头），由页面过滤掉，
+     上限放宽到 1000，免得它们把利好消息挤出列表 */
   return unwrap(await cloud.database.from('signals').select('*').order('id', { ascending: false }).limit(1000));
-}
-
-/** 新闻关注：signals 表里 source 以「关注:」开头的那些 */
-export async function listNews() {
-  return unwrap(await cloud.database.from('signals').select('*').like('source', '关注:%').order('id', { ascending: false }).limit(600));
 }
 
 export async function saveSignal(s) {

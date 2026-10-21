@@ -1,4 +1,4 @@
-/* 2.3 新功能端到端（claude.ai 版 + 模拟运行时）：快速记消费、新闻关注、九位专家、
+/* 2.3 新功能端到端（claude.ai 版 + 模拟运行时）：快速记消费、九位专家、
    以及「老数据不受影响」：已有的利好消息和账单在升级后照常显示 */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -9,13 +9,14 @@ mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 await ctx.addInitScript({ path: ROOT + 'test/mock-claude.js' });
-/* 预置老数据：一条利好消息、一笔老账 */
+/* 预置老数据：一条利好消息、一笔老账、一条旧版「新闻关注」收藏 */
 await ctx.addInitScript(() => {
   if (window.__seeded) return;
   window.__seeded = true;
   const base = 'data/users/user_test123/t/';
   if (!window.__mockStore) return;
   window.__mockStore[base + 'signals/501'] = { id: 501, owner_id: 'user_test123', title: '老的利好消息', content: '原来的内容', source: '财新', url: '', area: 'money', status: 'new', created_at: '2026-10-01T00:00:00Z' };
+  window.__mockStore[base + 'signals/502'] = { id: 502, owner_id: 'user_test123', title: '悉尼十月清盘率回升', content: '旧版收藏的新闻', source: '关注:au_home · Domain', url: '', area: 'money', status: 'new', created_at: '2026-10-02T00:00:00Z' };
   const d = new Date().toLocaleDateString('sv');
   window.__mockStore[base + 'transactions/601'] = { id: 601, owner_id: 'user_test123', tx_date: d, tx_time: '', merchant: '老账', amount: 20, direction: 'out', category: '餐饮', source: 'manual', raw_hash: 'old-1' };
 });
@@ -79,91 +80,32 @@ await page.waitForTimeout(900);
 const tx2 = await rowsOf('transactions');
 ok(tx2.length === 3 && tx2.some((x) => x.amount === 12 && x.category === '其他'), '只填金额回车也能记，归到「其他」');
 
-/* ---------- 新闻关注 ---------- */
-ok((await page.textContent('.home')).includes('新闻关注'), '首页有新闻关注卡');
-await openMore('新闻关注');
-ok((await page.textContent('.page-head h1')) === '新闻关注', '进入新闻关注页');
-ok((await page.$$('.nw-topic')).length === 6, '6 个话题卡');
-await page.click('.nw-topic:has-text("澳洲房市")');
+/* ---------- 新闻关注已删除 ---------- */
+ok(!(await page.textContent('.home')).includes('新闻关注'), '首页没有新闻关注卡');
+await page.click('.mobile-nav button:has-text("更多")');
 await page.waitForTimeout(300);
-const links = await page.$$eval('.nw-panel a.btn', (as) => as.map((a) => a.textContent + '|' + a.href));
-ok(links.length >= 4 && links[0].includes('baidu.com') && links.every((l) => l.includes('https://')), '一键搜最新：' + links.map((l) => l.split('|')[0]).join(' / '));
-await page.screenshot({ path: SHOTS + 'v23-news-topic.png' });
+ok(!(await page.$('.more-item:has-text("新闻关注")')), '「更多」里没有新闻关注');
+await page.click('.more-sheet-wrap', { position: { x: 10, y: 10 } });
+await page.waitForTimeout(300);
 
-await page.click('#nw-add');
-await page.waitForSelector('#nw-title');
-await page.fill('#nw-title', '悉尼十月清盘率回升');
-await page.fill('#nw-content', '周末清盘率回到 70% 以上');
-await page.fill('#nw-source', 'Domain');
-await page.click('#nw-save');
-await page.waitForTimeout(1500);
-let sig = await rowsOf('signals');
-const news1 = sig.find((x) => x.title === '悉尼十月清盘率回升');
-ok(news1 && news1.source === '关注:au_home · Domain', '收藏存进 signals，带话题标记');
-ok(news1 && news1.ai_score === 2 && String(news1.ai_take).includes('对你的投资目标很有利'), '保存后 AI 自动分析');
-ok((await page.textContent('.sg-list')).includes('悉尼十月清盘率回升'), '列表里显示');
-
-/* 整页粘贴 → AI 拆条 → 保存 */
-await page.click('#nw-add');
-await page.waitForSelector('#nw-title');
-await page.click('.editor-body .seg button:has-text("整页粘贴")');
-await page.fill('#nw-bulk', '澳联储维持利率不变 ABC 2026-10-20 …… 悉尼房价连续第三个月上涨 Domain ……');
-await page.click('#nw-parse');
-await page.waitForSelector('.nw-pick');
-ok((await page.$$('.nw-pick')).length === 2, 'AI 拆出 2 条');
-await page.click('#nw-bulk-save');
-await page.waitForTimeout(900);
-sig = await rowsOf('signals');
-ok(sig.filter((x) => String(x.source).startsWith('关注:au_home')).length === 3, '批量收藏 2 条');
-/* 同一页再粘一次不翻倍 */
-await page.click('#nw-add');
-await page.waitForSelector('#nw-title');
-await page.click('.editor-body .seg button:has-text("整页粘贴")');
-await page.fill('#nw-bulk', '同一页再粘贴一次 ………………');
-await page.click('#nw-parse');
-await page.waitForSelector('.nw-pick');
-await page.click('#nw-bulk-save');
-await page.waitForTimeout(900);
-sig = await rowsOf('signals');
-ok(sig.filter((x) => String(x.source).startsWith('关注:au_home')).length === 3, '重复粘贴同标题不翻倍');
-
-/* 已读、专题简报 */
-await page.click('.sg-card button:has-text("✓ 已读")');
-await page.waitForTimeout(600);
-sig = await rowsOf('signals');
-ok(sig.filter((x) => x.status === 'archived').length === 1, '标为已读');
-await page.click('#nw-brief');
-await page.waitForTimeout(1200);
-ok((await page.textContent('.nw-panel')).includes('模拟的 Claude 回答'), 'AI 专题简报生成');
-ok(JSON.stringify(await page.evaluate(() => window.__lastSample)).includes('悉尼十月清盘率回升'), '简报带上了收藏的新闻');
-
-/* ---------- 老数据不受影响，新闻不混进利好消息 ---------- */
+/* ---------- 老数据不受影响，旧版新闻收藏不混进利好消息 ---------- */
 await openMore('利好消息');
 const sgText = await page.textContent('.main');
 ok(sgText.includes('老的利好消息'), '老的利好消息还在');
-ok(!sgText.includes('悉尼十月清盘率回升'), '新闻不会混进利好消息页');
+ok(!sgText.includes('悉尼十月清盘率回升'), '旧版新闻收藏不会混进利好消息页');
 ok((await rowsOf('signals')).find((x) => x.id === 501)?.content === '原来的内容', '老数据内容一字未改');
 
-/* 转到利好消息 */
-await openMore('新闻关注');
-await page.click('.chip:has-text("全部")');
-await page.click('.seg button:has-text("全部")');
-await page.waitForTimeout(300);
-await page.click('.sg-card:has-text("悉尼十月清盘率回升") button:has-text("转到利好消息")');
-await page.waitForTimeout(700);
-ok((await rowsOf('signals')).find((x) => x.title === '悉尼十月清盘率回升')?.source === 'Domain', '转到利好消息后去掉话题标记、保留来源');
-
-/* ---------- 经济与房产顾问带着新闻 ---------- */
-await page.click('.chip:has-text("澳洲房市")');
-await page.waitForTimeout(300);
-await page.click('.nw-panel button:has-text("问经济与房产顾问")');
+/* ---------- 经济与房产顾问 ---------- */
+await page.click('.mobile-nav button:has-text("首页")');
+await page.waitForTimeout(800);
+await page.click('.home .expert-card:has-text("经济与房产顾问")');
 await page.waitForTimeout(800);
 ok((await page.textContent('.page-head h1')).includes('经济与房产顾问'), '打开经济与房产顾问');
 await page.fill('#chat-text', '澳洲房市怎么样？');
 await page.press('#chat-text', 'Enter');
 await page.waitForTimeout(1200);
 const sys = JSON.stringify(await page.evaluate(() => window.__lastSample));
-ok(sys.includes('澳联储维持利率不变') && sys.includes('不预测具体价格'), '顾问拿到了收藏的新闻和自己的原则');
+ok(sys.includes('不预测具体价格') && !sys.includes('收藏的新闻'), '顾问带着自己的原则，不再引用新闻收藏');
 ok(!(await page.$('#qs-fab')), '专家对话页不显示「＋」，不挡输入框');
 
 console.log('console errors:', errs.length, errs.slice(0, 3));

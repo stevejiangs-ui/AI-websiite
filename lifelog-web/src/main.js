@@ -39,7 +39,6 @@ import {
 } from '@platform';
 import { setupLogin, loginView } from './view-login.js';
 import { recordsView, loadRecords } from './view-records.js';
-import { newsView, loadNews } from './view-news.js';
 import { quickSpendFab, quickSpendSheet, openQuickSpend } from './quick-spend.js';
 
 const root = document.getElementById('app');
@@ -55,7 +54,6 @@ const NAV = [
   { k: 'tx', label: '账单 / 导入', icon: '≡' },
   { k: 'records', label: '消费记录', icon: '🧾' },
   { k: 'signals', label: '利好消息', icon: '✦' },
-  { k: 'news', label: '新闻关注', icon: '🗞' },
   { k: 'people', label: '家人与圈子', icon: '◉', group: '家庭' },
   { k: 'health', label: '身体健康', icon: '✚', group: '身心' },
   { k: 'looks', label: '穿搭形象', icon: '✧' },
@@ -76,7 +74,6 @@ const MOBILE_TABS = [
 
 /* 「更多」弹层里的入口，按板块排 */
 const MORE_ITEMS = [
-  { k: 'news', label: '新闻关注', icon: '🗞️' },
   { k: 'tx', label: '账单 / 记一笔', icon: '💳' },
   { k: 'signals', label: '利好消息', icon: '📰' },
   { k: 'people', label: '家人与圈子', icon: '🏠' },
@@ -285,8 +282,6 @@ function currentView() {
       return looksView();
     case 'signals':
       return signalsView();
-    case 'news':
-      return newsView();
     case 'bazi':
       return baziSelfView();
     case 'fortune':
@@ -345,7 +340,6 @@ async function go(view) {
   if (view === 'health') tasks.push(loadHealth().catch(fail('健康')));
   if (view === 'looks') tasks.push(loadLooks().catch(fail('穿搭')));
   if (view === 'signals') tasks.push(loadSignals().catch(fail('利好消息')));
-  if (view === 'news') tasks.push(loadNews().catch(fail('新闻关注')));
   if (view === 'bazi') {
     try {
       ensureBirth();

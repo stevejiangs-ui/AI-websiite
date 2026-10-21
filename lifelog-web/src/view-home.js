@@ -10,7 +10,6 @@ import { EXPERTS, expertOf } from './experts.js';
 import { openExpert } from './view-expert.js';
 import { loadHealth, healthSummary } from './view-health.js';
 import { loadSignals, signalsSummary } from './view-signals.js';
-import { loadNews, newsSummary, focusNewsTopic } from './view-news.js';
 import { openQuickSpend } from './quick-spend.js';
 import { loadLooks, looksRecent } from './view-looks.js';
 import { runDigest } from './view-diary.js';
@@ -74,7 +73,7 @@ export async function loadHome() {
       })
       .catch(() => {});
   }
-  await Promise.all([loadHealth().catch(() => {}), loadSignals().catch(() => {}), loadLooks().catch(() => {}), loadNews().catch(() => {})]);
+  await Promise.all([loadHealth().catch(() => {}), loadSignals().catch(() => {}), loadLooks().catch(() => {})]);
   render();
 }
 
@@ -438,37 +437,6 @@ function spendCard() {
   );
 }
 
-/* ---------- 新闻关注 ---------- */
-
-function newsCard() {
-  const ns = newsSummary();
-  if (!ns.loaded || ns.missing) return null;
-  return h(
-    'div',
-    { class: 'home-card' },
-    h('div', { class: 'row-between' }, h('div', { class: 'home-card-title', style: 'margin:0' }, `🗞️ 新闻关注${ns.unread ? ' · ' + ns.unread + ' 条未读' : ''}`), h('button', { class: 'link', style: 'font-size:12px', onclick: () => goTile('news') }, '全部 ›')),
-    h(
-      'div',
-      { class: 'nw-home' },
-      ...ns.topics.map((x) =>
-        h(
-          'button',
-          {
-            class: 'nw-home-item',
-            onclick: () => {
-              focusNewsTopic(x.t.k);
-              goTile('news');
-            }
-          },
-          h('span', {}, x.t.emoji),
-          h('div', { style: 'flex:1;min-width:0' }, h('b', {}, x.t.label), h('div', { class: 'muted nw-home-latest' }, x.latest ? x.latest.title : '点一下搜最新')),
-          x.unread ? h('span', { class: 'nw-dot' }, x.unread) : null
-        )
-      )
-    )
-  );
-}
-
 /* ---------- 家人提醒 ---------- */
 
 async function contacted(p) {
@@ -543,7 +511,6 @@ export function homeView() {
     spendCard(),
     pillars(),
     familyCard(),
-    newsCard(),
 
     /* 今日待办 */
     h(
