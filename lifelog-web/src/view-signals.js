@@ -7,12 +7,14 @@ import { listSignals, saveSignal, deleteSignal, listGoals, SIGNAL_AREAS, signalA
 import { askJSON } from './ai.js';
 import { luckyLine } from './lucky.js';
 import { setupCard } from './view-setup.js';
+import { isNewsItem } from './news.js';
 
 let sg = { loaded: false, items: [], missing: false, tab: 'new', area: '', form: null, busy: false, analyzing: {} };
 
 export async function loadSignals() {
   try {
-    sg.items = (await listSignals()) || [];
+    /* 新闻关注的条目也在这张表里，这页只显示利好消息本身 */
+    sg.items = ((await listSignals()) || []).filter((x) => !isNewsItem(x));
     sg.missing = false;
   } catch (e) {
     if (isMissingTable(e)) sg.missing = true;

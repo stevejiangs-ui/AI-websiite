@@ -1,6 +1,6 @@
 {
   "name": "lifelog-web",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "个人APP：日记 + 账单 + 目标 + 圈子 + 八字命理。WorkBuddy 版（国内可用）/ claude.ai 版 双构建",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "build:claude": "node build.mjs",
     "sync": "bash sync.sh",
     "test": "for f in test/verify-*.mjs; do node $f | tail -1; done",
-    "e2e": "node build.mjs && node test/build-wb-test.mjs && node test/e2e-wb.mjs && node test/e2e-life.mjs && node test/e2e-auth.mjs && node test/e2e-basic.mjs && node test/e2e-more.mjs"
+    "e2e": "node build.mjs && node test/build-wb-test.mjs && node test/e2e-wb.mjs && node test/e2e-life.mjs && node test/e2e-v23.mjs && node test/e2e-auth.mjs && node test/e2e-basic.mjs && node test/e2e-more.mjs"
   },
   "dependencies": {
     "@tencent-ai/workbuddy-cloud-sdk": "^0.1.4-dev.ca27990.202610161713"

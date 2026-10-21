@@ -1,4 +1,5 @@
 import { h, setState, render, toast, state, ask } from './store.js';
+import { importBody } from './view-import.js';
 import {
   listTransactions,
   updateTransaction,
@@ -18,6 +19,16 @@ import {
 } from './cloud.js';
 
 let adding = null;
+
+/* 账单页两个标签：明细 / 导入。原来是两个独立菜单，用户要求合并成一处，
+   记完账顺手就能导入，不用来回切页面。 */
+let txTab = 'list'; /* list | import */
+
+export function setTxTab(t) {
+  if (txTab === t) return;
+  txTab = t;
+  render();
+}
 
 export async function loadTx() {
   setState({ loading: true });
@@ -112,6 +123,21 @@ export function txView() {
   const list = state.tx || [];
   const monthLabel = state.txMonth;
 
+  if (txTab === 'import') {
+    return h(
+      'div',
+      {},
+      h(
+        'div',
+        { class: 'page-head' },
+        h('div', {}, h('h1', {}, '账单'), h('p', { class: 'desc' }, '导入支付宝 / 微信 / 银行流水，自动分类')),
+        h('div', { class: 'toolbar' }, h('button', { class: 'btn btn-sm btn-ghost', onclick: () => setTxTab('list') }, '← 回明细'))
+      ),
+      txTabs(),
+      importBody()
+    );
+  }
+
   return h(
     'div',
     {},
@@ -129,10 +155,11 @@ export function txView() {
           value: state.txMonth,
           onchange: (ev) => changeMonth(ev.target.value || currentMonth())
         }),
-        h('button', { class: 'btn btn-sm btn-ghost', onclick: () => setState({ view: 'import' }) }, '导入账单'),
         h('button', { class: 'btn btn-sm btn-accent', onclick: startAdd }, '+ 记一笔')
       )
     ),
+
+    txTabs(),
 
     /* 记一笔的表单放在最上面：手机上原来排在三张统计卡下面，点了按钮要往下翻才看得到 */
     adding ? addForm() : null,
@@ -423,4 +450,18 @@ function addForm() {
 
 function field(label, node) {
   return h('div', {}, h('div', { class: 'muted', style: 'margin-bottom:5px' }, label), node);
+}
+
+/* 标签条：明细 / 导入 */
+function txTabs() {
+  return h(
+    'div',
+    { class: 'seg', style: 'margin-bottom:16px' },
+    ...[
+      { k: 'list', l: '明细' },
+      { k: 'import', l: '导入' }
+    ].map((t) =>
+      h('button', { class: txTab === t.k ? 'on' : '', onclick: () => setTxTab(t.k) }, t.l)
+    )
+  );
 }

@@ -23,7 +23,8 @@ if [ -f "$SW" ]; then
   sed -i.bak "s/lifelog-v[0-9]*/lifelog-v$NEXT/" "$SW" && rm -f "$SW.bak"
   echo "    Service Worker 缓存版本 -> v$NEXT"
 fi
-[ -d node_modules ] || npm install
+# vite 8 和 esbuild 0.25 的 peer 依赖声明冲突，全新安装要加 --legacy-peer-deps
+[ -d node_modules ] || npm install --legacy-peer-deps
 npx vite build
 
 echo "==> 3/3 同步到 web/"

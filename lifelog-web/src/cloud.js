@@ -233,6 +233,27 @@ export async function deleteTransaction(id) {
   return Array.isArray(rows) ? rows.length > 0 : false;
 }
 
+/* 流水去重键。表上 (owner_id, raw_hash) 唯一，且 raw_hash 是 NOT NULL ——
+   任何自己拼记录、不走导入器的调用方（比如「档案」导入）都必须带上它，
+   否则整批插入会被 Postgres 直接拒掉（not-null violation）。
+   放这里而不是只放导入器里，是为了让 batchInsertTransactions 自己兜住。 */
+export function txRawHash(r) {
+  const str = [
+    r.tx_date || '',
+    r.tx_time || '',
+    String(r.merchant || '').trim(),
+    Number(r.amount) || 0,
+    r.direction === 'in' ? 'in' : 'out',
+    r.source || 'manual'
+  ].join('|');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16) + '_' + str.length;
+}
+
 export async function batchInsertTransactions(records, session) {
   if (!records.length) return { inserted: 0, skipped: 0 };
   const name = session?.user?.name ?? null;
@@ -249,7 +270,7 @@ export async function batchInsertTransactions(records, session) {
     direction: r.direction,
     category: r.category || guessCategoryStatic(`${r.merchant} ${r.description || ''}`, r.direction),
     source: r.source || 'file',
-    raw_hash: r.raw_hash,
+    raw_hash: r.raw_hash || txRawHash(r),
     owner_name: name
   }));
   let inserted = 0;
@@ -787,7 +808,14 @@ export function signalArea(k) {
 }
 
 export async function listSignals() {
-  return unwrap(await cloud.database.from('signals').select('*').order('id', { ascending: false }).limit(300));
+  /* 新闻关注也存在这张表里（source 以「关注:」开头），一起读出来再由页面分开，
+     上限放宽到 1000，免得新闻多了把老的利好消息挤出列表 */
+  return unwrap(await cloud.database.from('signals').select('*').order('id', { ascending: false }).limit(1000));
+}
+
+/** 新闻关注：signals 表里 source 以「关注:」开头的那些 */
+export async function listNews() {
+  return unwrap(await cloud.database.from('signals').select('*').like('source', '关注:%').order('id', { ascending: false }).limit(600));
 }
 
 export async function saveSignal(s) {

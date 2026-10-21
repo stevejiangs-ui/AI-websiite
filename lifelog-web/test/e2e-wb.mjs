@@ -56,7 +56,7 @@ await page.waitForTimeout(1500);
 ok(await page.isVisible('text=今天去了公司，晚上吃了兰州拉面'), '日记保存 + 国产模型提炼');
 const models = await page.evaluate(() => window.__wbLLM || []);
 ok(models.some((m) => /^glm/.test(m)), 'AI 用的是 WorkBuddy 模型：' + [...new Set(models)].join(','));
-await nav('账单');
+await nav('账单 / 导入');
 await page.click('text=+ 记一笔');
 await page.fill('input[placeholder="例如 美团"]', '兰州拉面馆');
 await page.fill('input[placeholder="0.00"]', '18');

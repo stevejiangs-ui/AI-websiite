@@ -298,6 +298,11 @@ async function inflateRawAsync(data) {
   return new Uint8Array(ab);
 }
 
+/* 对外暴露：.docx / .xlsx 都是 zip，解压逻辑只写一份 */
+export async function readZip(buf) {
+  return readZipEntriesAsync(buf);
+}
+
 async function readZipEntriesAsync(buf) {
   const out = {};
   let i = 0;

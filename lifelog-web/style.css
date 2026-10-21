@@ -4921,3 +4921,202 @@ code {
     font-size: 17px;
   }
 }
+
+/* ================= 2.3：快速记消费、新闻关注、九位专家 ================= */
+
+/* 专家 9 位：排成 3×3 */
+.expert-grid { grid-template-columns: repeat(3, 1fr); }
+
+/* 右下角「＋ 记消费」 */
+.qs-fab {
+  position: fixed;
+  right: 22px;
+  bottom: 24px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 18px 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(180, 85, 47, 0.35);
+  cursor: pointer;
+}
+.qs-fab:active { transform: scale(0.96); }
+.qs-plus { font-size: 20px; line-height: 1; }
+
+.qs-amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin: 4px 0 14px;
+}
+.qs-cur { font-size: 26px; font-weight: 700; color: var(--ink-2); }
+.qs-amount {
+  width: 200px;
+  max-width: 70%;
+  border: none;
+  border-bottom: 2px solid var(--line);
+  outline: none;
+  background: transparent;
+  font-size: 40px !important;
+  font-weight: 700;
+  text-align: center;
+  padding: 2px 0;
+  font-family: inherit;
+  color: var(--ink);
+}
+.qs-amount:focus { border-bottom-color: var(--accent); }
+.qs-chip { border-width: 1px; border-style: solid; }
+
+/* 首页：今日消费条 */
+.qs-home {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+}
+.qs-home-v { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+
+/* 「更多」里的记消费入口 */
+.more-item-accent { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+@media (max-width: 860px) {
+  .qs-fab {
+    right: 16px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    height: 52px;
+    width: 52px;
+    padding: 0;
+    justify-content: center;
+  }
+  .qs-fab-t { display: none; }
+  .qs-plus { font-size: 26px; }
+  /* 手机上记消费是底部弹出的半屏，不占满全屏 */
+  .qs-wrap { align-items: flex-end; }
+  .qs-wrap .qs-panel {
+    height: auto;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* 新闻关注 */
+.nw-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.nw-topic {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.nw-topic:hover { border-color: var(--accent); }
+.nw-topic.hot { border-color: #e4b7a2; background: var(--accent-soft); }
+.nw-topic-head { display: flex; align-items: center; gap: 6px; }
+.nw-em { font-size: 18px; }
+.nw-latest {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: 2.8em;
+  line-height: 1.4;
+}
+.nw-dot {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.nw-panel a.btn { text-decoration: none; }
+.nw-new {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.nw-read { opacity: 0.82; }
+.nw-link { display: block; color: var(--ink); text-decoration: none; }
+.nw-link:hover { color: var(--accent); text-decoration: underline; }
+.nw-chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+.nw-chips .chip { flex: none; }
+.nw-pick {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 13.5px;
+}
+.nw-pick input { margin-top: 3px; }
+.nw-home {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.nw-home-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  font-size: 13px;
+  min-width: 0;
+}
+.nw-home-item:hover { border-color: var(--accent); }
+.nw-home-latest {
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 560px) {
+  .nw-grid { grid-template-columns: 1fr 1fr; }
+}
+.qs-save { width: 100%; height: 46px; font-size: 16px; justify-content: center; }
+.qs-date { flex: none; width: 138px; }
+.nw-panel a.nw-search {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.nw-panel a.nw-search:hover { border-color: var(--accent); color: var(--accent); }

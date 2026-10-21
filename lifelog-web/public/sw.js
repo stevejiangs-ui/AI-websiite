@@ -14,7 +14,7 @@
    改版发布时把 CACHE 的数字加一（sync.sh 会自动做），
    新 SW 装好立刻接管，并清掉所有旧缓存。 */
 
-const CACHE = 'lifelog-v19';
+const CACHE = 'lifelog-v23';
 const SHELL = ['./index.html', './manifest.webmanifest', './icon-192.png'];
 
 self.addEventListener('install', (e) => {

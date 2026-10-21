@@ -7,7 +7,6 @@ import { errText, loadRules } from './cloud.js';
 import { h, setState, setRootBuilder, mountRender, render, toast, state } from './store.js';
 import { diaryView, editorView, loadEntries, openEditor } from './view-diary.js';
 import { txView, loadTx } from './view-tx.js';
-import { importView } from './view-import.js';
 import { chatView } from './view-chat.js';
 import { settingsView, applyNickname } from './view-settings.js';
 import { goalsView, loadGoals, loadTasks, goalEditorView, taskEditorView } from './view-goals.js';
@@ -39,6 +38,9 @@ import {
   signOutRemote
 } from '@platform';
 import { setupLogin, loginView } from './view-login.js';
+import { recordsView, loadRecords } from './view-records.js';
+import { newsView, loadNews } from './view-news.js';
+import { quickSpendFab, quickSpendSheet, openQuickSpend } from './quick-spend.js';
 
 const root = document.getElementById('app');
 
@@ -50,9 +52,10 @@ const NAV = [
   { k: 'goals', label: '目标 / 任务 / 日程', icon: '◎' },
   { k: 'life', label: '工作与生活', icon: '◈' },
   { k: 'finance', label: '财富总览', icon: '¥', group: '财富' },
-  { k: 'tx', label: '账单', icon: '≡' },
-  { k: 'import', label: '导入账单', icon: '⇪' },
+  { k: 'tx', label: '账单 / 导入', icon: '≡' },
+  { k: 'records', label: '消费记录', icon: '🧾' },
   { k: 'signals', label: '利好消息', icon: '✦' },
+  { k: 'news', label: '新闻关注', icon: '🗞' },
   { k: 'people', label: '家人与圈子', icon: '◉', group: '家庭' },
   { k: 'health', label: '身体健康', icon: '✚', group: '身心' },
   { k: 'looks', label: '穿搭形象', icon: '✧' },
@@ -73,6 +76,7 @@ const MOBILE_TABS = [
 
 /* 「更多」弹层里的入口，按板块排 */
 const MORE_ITEMS = [
+  { k: 'news', label: '新闻关注', icon: '🗞️' },
   { k: 'tx', label: '账单 / 记一笔', icon: '💳' },
   { k: 'signals', label: '利好消息', icon: '📰' },
   { k: 'people', label: '家人与圈子', icon: '🏠' },
@@ -83,7 +87,7 @@ const MORE_ITEMS = [
   { k: 'fortune', label: '每日运势', icon: '🔮' },
   { k: 'chat', label: '问问账本', icon: '💬' },
   { k: 'expert', label: '专家中心', icon: '🧑‍💼' },
-  { k: 'import', label: '导入账单', icon: '⇪' },
+  { k: 'records', label: '消费记录 / 导入旧账', icon: '🧾' },
   { k: 'place', label: '我在哪里', icon: '📍' },
   { k: 'settings', label: '设置', icon: '⚙' }
 ];
@@ -163,7 +167,10 @@ function shell() {
        那条路漏挂过一次，表现为「点了没反应」——这类隐患从根上掐掉。 */
     goalEditorView(),
     /* 任务 / 日程编辑面板同样放全局层 */
-    taskEditorView()
+    taskEditorView(),
+    /* 快速记消费：右下角「＋」和它的弹层，任何页面都能用 */
+    quickSpendFab(),
+    quickSpendSheet()
   );
 }
 
@@ -202,6 +209,18 @@ function moreSheet() {
       h(
         'div',
         { class: 'more-grid' },
+        h(
+          'button',
+          {
+            class: 'more-item more-item-accent',
+            onclick: () => {
+              state.moreOpen = false;
+              openQuickSpend();
+            }
+          },
+          h('span', { class: 'em' }, '➕'),
+          '记一笔消费'
+        ),
         ...MORE_ITEMS.map((n) =>
           h(
             'button',
@@ -220,7 +239,7 @@ function moreSheet() {
       h(
         'div',
         { style: 'padding:12px 16px 18px' },
-        h('p', { class: 'muted', style: 'margin:0 0 10px;font-size:12px' }, '找专家帮忙'),
+        h('p', { class: 'muted', style: 'margin:0 0 10px;font-size:12px' }, `找专家帮忙 · ${EXPERTS.length} 位`),
         h(
           'div',
           { class: 'expert-grid' },
@@ -266,6 +285,8 @@ function currentView() {
       return looksView();
     case 'signals':
       return signalsView();
+    case 'news':
+      return newsView();
     case 'bazi':
       return baziSelfView();
     case 'fortune':
@@ -274,8 +295,14 @@ function currentView() {
       return financeView();
     case 'tx':
       return txView();
+    case 'records':
+      return recordsView();
+    /* 上一版叫「档案」，留着这个分支避免旧书签/旧入口白屏 */
+    case 'archive':
+      return recordsView();
+    /* 老的「导入账单」入口：现在并进账单页的「导入」标签 */
     case 'import':
-      return importView();
+      return txView();
     case 'chat':
       return chatView();
     case 'settings':
@@ -318,6 +345,7 @@ async function go(view) {
   if (view === 'health') tasks.push(loadHealth().catch(fail('健康')));
   if (view === 'looks') tasks.push(loadLooks().catch(fail('穿搭')));
   if (view === 'signals') tasks.push(loadSignals().catch(fail('利好消息')));
+  if (view === 'news') tasks.push(loadNews().catch(fail('新闻关注')));
   if (view === 'bazi') {
     try {
       ensureBirth();
@@ -335,6 +363,7 @@ async function go(view) {
   }
   if (view === 'finance') tasks.push(loadFinance().catch(fail('财务')));
   if (view === 'tx') tasks.push(loadTx().catch(fail('账单')));
+  if (view === 'records' || view === 'archive') tasks.push(loadRecords().catch(fail('消费记录')));
   if (view === 'chat') {
     tasks.push(
       ensureModel()
@@ -541,6 +570,11 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', guardIdle);
 setInterval(guardIdle, 30 * 1000);
 window.addEventListener('lifelog-signout', () => signOut(''));
+/* 快速记消费保存后：当前页面用到账单数据的，就地刷新 */
+window.addEventListener('lifelog-tx-changed', () => {
+  const reload = { home: loadHome, tx: loadTx, finance: loadFinance, records: loadRecords, archive: loadRecords }[state.view];
+  if (reload) reload().catch((e) => console.error('[tx-changed]', e));
+});
 /* 各页面要跳转时发 lifelog-go 事件（避免循环导入 main.js） */
 window.addEventListener('lifelog-go', (ev) => {
   if (ev.detail) go(ev.detail);

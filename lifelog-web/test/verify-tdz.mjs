@@ -18,8 +18,11 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SRC = new URL('../src', import.meta.url).pathname;
+/* Windows 上 URL.pathname 会带前导斜杠（/C:/...），直接读会拼成 C://C://...，
+   之前这个测试一直报 ENOENT 就是这个原因 —— 等于没在跑。 */
+const SRC = fileURLToPath(new URL('../src', import.meta.url));
 const files = readdirSync(SRC).filter((f) => f.endsWith('.js'));
 
 const BLOCK_COMMENT = new RegExp('/' + '\\*' + '[\\s\\S]*?' + '\\*' + '/', 'g');
